@@ -1,0 +1,16 @@
+# Generated output
+dist/
+
+# API response cache
+.cache.db
+.cache.json
+
+# Dependencies
+node_modules/
+
+.env
+.claude
+.devenv*
+MCD.*
+!MCD.md
+

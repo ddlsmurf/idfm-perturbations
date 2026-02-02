@@ -1,0 +1,74 @@
+name: Generate Line-Station Mapping
+
+on:
+  schedule:
+    - cron: '0 3 * * 0'  # Weekly on Sunday at 3am
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate-mapping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # Need history to check if last commit should be amended
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate line-station mapping
+        run: make mapping
+        env:
+          IDFM_API_KEY: ${{ secrets.IDFM_API_KEY }}
+
+      - name: Show stats
+        run: |
+          sqlite3 cache/line_station_mapping.db "SELECT * FROM metadata"
+          sqlite3 cache/line_station_mapping.db "SELECT COUNT(*) FROM line_stations"
+
+          API_CALLS=$(sqlite3 cache/line_station_mapping.db "SELECT value FROM metadata WHERE key='api_call_count'")
+          LINE_COUNT=$(sqlite3 cache/line_station_mapping.db "SELECT value FROM metadata WHERE key='line_count'")
+          STATION_COUNT=$(sqlite3 cache/line_station_mapping.db "SELECT value FROM metadata WHERE key='station_count'")
+          GENERATED_AT=$(sqlite3 cache/line_station_mapping.db "SELECT value FROM metadata WHERE key='generated_at'")
+
+          echo "::notice title=API Usage::${API_CALLS} API calls made"
+
+          cat >> "$GITHUB_STEP_SUMMARY" << EOF
+          ## Line-Station Mapping Stats
+          | Metric | Value |
+          |--------|-------|
+          | Generated | ${GENERATED_AT} |
+          | Lines | ${LINE_COUNT} |
+          | Stations | ${STATION_COUNT} |
+          | API Calls | ${API_CALLS} |
+          EOF
+
+      - name: Commit mapping
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add cache/line_station_mapping.db
+
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          LAST_AUTHOR=$(git log -1 --format='%an')
+          LAST_MSG=$(git log -1 --format='%s')
+
+          if [ "$LAST_AUTHOR" = "github-actions[bot]" ] && [ "$LAST_MSG" = "chore: update line-station mapping" ]; then
+            echo "⚠️ **Amending previous mapping commit.** Local clones may need \`git pull --force\`." >> "$GITHUB_STEP_SUMMARY"
+            git commit --amend --no-edit
+            git push --force
+          else
+            git commit -m "chore: update line-station mapping"
+            git push
+          fi

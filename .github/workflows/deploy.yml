@@ -1,0 +1,68 @@
+name: Deploy to Cloudflare Pages
+
+on:
+  schedule:
+    # Rush hours Mon-Sat: every 15 min (morning 5-8 UTC, evening 15-18 UTC)
+    - cron: '7/15 5-8 * * 1-6'
+    - cron: '7/15 15-18 * * 1-6'
+    # Daytime off-peak Mon-Sat: every 30 min (9-14 UTC)
+    - cron: '7/30 9-14 * * 1-6'
+    # Night (all days): every 45 min
+    - cron: '0 19,22,1,4 * * *'
+    - cron: '45 19,22,1,4 * * *'
+    - cron: '30 20,23,2 * * *'
+    - cron: '15 21,0,3 * * *'
+    # Sunday daytime: every 2 hours
+    - cron: '13 5,7,9,11,13,15,17 * * 0'
+  workflow_dispatch:
+  push:
+    branches: [main]
+  workflow_run:
+    workflows: ["Generate Line-Station Mapping"]
+    types: [completed]
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate calendars
+        id: generate
+        run: |
+          npm run generate 2>&1 | tee /tmp/generate.log
+          API_CALLS=$(grep "API calls:" /tmp/generate.log | sed 's/.*API calls: //')
+          echo "api_calls=${API_CALLS}" >> "$GITHUB_OUTPUT"
+        env:
+          IDFM_API_KEY: ${{ secrets.IDFM_API_KEY }}
+
+      - name: Report stats
+        run: |
+          echo "::notice title=API Usage::${{ steps.generate.outputs.api_calls }} API calls made"
+          cat >> "$GITHUB_STEP_SUMMARY" << EOF
+          ## Calendar Generation Stats
+          | Metric | Value |
+          |--------|-------|
+          | API Calls | ${{ steps.generate.outputs.api_calls }} |
+          EOF
+
+      - name: Deploy to Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          for i in 1 2 3; do
+            npx wrangler pages deploy dist/calendars --project-name=prim2ics && exit 0
+            echo "Attempt $i failed, waiting 10s..."
+            sleep 10
+          done
+          exit 1
