@@ -1025,17 +1025,31 @@
       return !!(search || mode || network);
     }
 
+    function searchScore(item, queryWords) {
+      const primaryWords = toWords(`${item.code || ''} ${item.name}`);
+      const secondaryWords = toWords(`${item.commune || ''} ${item.network || ''} ${item.mode || ''}`);
+      let score = 0;
+      for (const q of queryWords) {
+        if (primaryWords.some(w => w.startsWith(q))) score += 2;
+        else if (secondaryWords.some(w => w.startsWith(q))) score += 1;
+        else return 0;
+      }
+      return score;
+    }
+
     function getFilteredItems() {
-      const search = stripAccents(document.getElementById('search').value.toLowerCase());
+      const words = toWords(document.getElementById('search').value);
       const mode = document.getElementById('mode-filter').value;
       const network = document.getElementById('network-filter').value;
       const sort = document.getElementById('sort').value;
 
       let items = currentTab === 'lines' ? data.lines : data.stations;
 
+      if (words.length) {
+        items = items.map(item => ({ ...item, _score: searchScore(item, words) })).filter(item => item._score > 0);
+      }
+
       items = items.filter(item => {
-        const searchStr = stripAccents(`${item.code || ''} ${item.name} ${item.commune || ''} ${item.network || ''} ${item.mode || ''}`.toLowerCase());
-        if (search && !searchStr.includes(search)) return false;
         if (currentTab === 'lines') {
           if (mode && item.mode !== mode) return false;
           if (network && item.network !== network) return false;
@@ -1044,8 +1058,12 @@
       });
 
       items.sort((a, b) => {
+        if (words.length) {
+          const scoreDiff = b._score - a._score;
+          if (scoreDiff !== 0) return scoreDiff;
+        }
+
         let sortKey = sort;
-        // For stations, 'code' sorts by name instead
         if (currentTab === 'stations' && sort === 'code') sortKey = 'name';
 
         if (sortKey === 'code') {
@@ -1160,15 +1178,14 @@
     }
 
     function getFilteredItemsForTab(tab) {
-      const search = stripAccents(document.getElementById('search').value.toLowerCase());
+      const words = toWords(document.getElementById('search').value);
       const mode = document.getElementById('mode-filter').value;
       const network = document.getElementById('network-filter').value;
 
       let items = tab === 'lines' ? data.lines : data.stations;
 
       return items.filter(item => {
-        const searchStr = stripAccents(`${item.code || ''} ${item.name} ${item.commune || ''} ${item.network || ''} ${item.mode || ''}`.toLowerCase());
-        if (search && !searchStr.includes(search)) return false;
+        if (words.length && !searchScore(item, words)) return false;
         if (tab === 'lines') {
           if (mode && item.mode !== mode) return false;
           if (network && item.network !== network) return false;
@@ -1268,6 +1285,10 @@
 
     function stripAccents(str) {
       return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+    }
+
+    function toWords(str) {
+      return str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/[^a-z0-9]+/).filter(Boolean);
     }
 
     function escHtml(str) {
