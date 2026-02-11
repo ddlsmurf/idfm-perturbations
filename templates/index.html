@@ -440,7 +440,7 @@
         case 'apple':
           return httpsUrl.replace(/^https?:/, 'webcal:');
         case 'google':
-          return 'https://calendar.google.com/calendar/r?cid=' + encodeURIComponent(httpsUrl);
+          return 'https://calendar.google.com/calendar/r?cid=' + encodeURIComponent(httpsUrl.replace(/^https?:/, 'webcal:'));
         case 'outlook':
           return 'https://outlook.live.com/calendar/0/addfromweb?url=' + encodeURIComponent(httpsUrl);
         default:
