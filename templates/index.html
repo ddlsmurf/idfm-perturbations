@@ -423,6 +423,7 @@
       apple:   { label: { fr: 'Apple (webcal://)', en: 'Apple (webcal://)' } },
       google:  { label: { fr: 'Google Agenda', en: 'Google Calendar' } },
       outlook: { label: { fr: 'Outlook',       en: 'Outlook' } },
+      copy:    { label: { fr: 'Copier le lien', en: 'Copy link' } },
     };
 
     function detectDefaultPlatform() {
@@ -443,15 +444,17 @@
           return 'https://calendar.google.com/calendar/r?cid=' + encodeURIComponent(httpsUrl.replace(/^https?:/, 'webcal:'));
         case 'outlook':
           return 'https://outlook.live.com/calendar/0/addfromweb?url=' + encodeURIComponent(httpsUrl);
+        case 'copy':
+          return httpsUrl;
         default:
           throw new Error(`Unknown calendar platform: ${JSON.stringify(currentPlatform)}, expected one of: ${JSON.stringify(Object.keys(CALENDAR_PLATFORMS))}`);
       }
     }
 
     const ICONS = {
-      copy: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="11" height="10" rx="5"/><rect x="11" y="7" width="11" height="10" rx="5"/></svg>`,
       subscribe: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="12" y1="13" x2="12" y2="19"/><line x1="9" y1="16" x2="15" y2="16"/></svg>`,
       preview: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1,12 C4,4 20,4 23,12 C20,20 4,20 1,12"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg>`,
+      location: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>`,
     };
 
     const MODE_ICONS = {
@@ -501,9 +504,9 @@
         noResults: "Aucun résultat",
         urlCopied: "URL copiée",
         preview: "Aperçu",
-        copy: "Copier",
         copied: "Copié!",
         addCal: "+ 📆",
+        showMap: "Voir sur la carte",
         updatedAt: "Mis à jour le",
         lines: "lignes",
         stations: "stations",
@@ -518,8 +521,8 @@
         noDisruption: "Aucune perturbation",
         legendTitle: "Boutons affichés sur chaque ligne et station ci-dessous",
         legendPreview: "Aperçu (visible si perturbation en cours)",
-        legendCopy: "Copier le lien .ics",
         legendSubscribe: "S'abonner via",
+        legendMap: "Localiser la station",
         previewLoading: "Chargement...",
         updateFrequency: 'Mise à jour toutes les ~15 min aux heures de pointe (lun-sam 7h-11h, 17h-21h), ~30 min en journée, ~45 min la nuit et le dimanche (<a href="https://upptime.js.org/blog/2021/01/22/github-actions-schedule-not-working/">délais variables selon GitHub</a>)',
         footer: 'Données : <a href="https://prim.iledefrance-mobilites.fr/">IDFM PRIM</a> (API Navitia) — Hébergement offert par <a href="https://pages.cloudflare.com/">Cloudflare</a> — Moulinette offerte par <a href="https://github.com/features/actions">GitHub</a> — Aucune garantie d\'exactitude ou de disponibilité',
@@ -552,9 +555,9 @@
         noResults: "No results",
         urlCopied: "URL copied",
         preview: "Preview",
-        copy: "Copy",
         copied: "Copied!",
         addCal: "+ 📆",
+        showMap: "Show on map",
         updatedAt: "Updated on",
         lines: "lines",
         stations: "stations",
@@ -569,8 +572,8 @@
         noDisruption: "No disruptions",
         legendTitle: "Buttons shown on each line and station below",
         legendPreview: "Preview (visible if disruption exists)",
-        legendCopy: "Copy .ics link",
         legendSubscribe: "Subscribe via",
+        legendMap: "Locate station",
         previewLoading: "Loading...",
         updateFrequency: 'Updated every ~15 min during rush hours (Mon-Sat 7am-11am, 5pm-9pm), ~30 min daytime, ~45 min at night and Sundays (<a href="https://upptime.js.org/blog/2021/01/22/github-actions-schedule-not-working/">actual timing depends on GitHub</a>)',
         footer: 'Data: <a href="https://prim.iledefrance-mobilites.fr/">IDFM PRIM</a> (Navitia API) — Hosting by <a href="https://pages.cloudflare.com/">Cloudflare</a> — Processing by <a href="https://github.com/features/actions">GitHub</a> — No guarantee of accuracy or availability',
@@ -803,8 +806,8 @@
         <span>${ICONS.subscribe} ${t('legendSubscribe')}
           <select id="platform-select">${platformOptions}</select>
         </span>
-        <span>${ICONS.copy} ${t('legendCopy')}</span>
         <span>${ICONS.preview} ${t('legendPreview')}</span>
+        <span>${ICONS.location} ${t('legendMap')}</span>
       `;
 
       document.getElementById('platform-select').addEventListener('change', (e) => {
@@ -887,10 +890,19 @@
 
       // Event delegation for buttons
       document.addEventListener('click', (e) => {
-        const copyBtn = e.target.closest('.copy-btn');
-        if (copyBtn) {
+        const subscribeBtn = e.target.closest('.subscribe-btn');
+        if (subscribeBtn && currentPlatform === 'copy') {
           e.preventDefault();
-          copyUrl(copyBtn);
+          const url = subscribeBtn.dataset.url;
+          navigator.clipboard.writeText(url).then(() => {
+            subscribeBtn.innerHTML = '✓';
+            subscribeBtn.classList.add('copied');
+            showToast();
+            setTimeout(() => {
+              subscribeBtn.innerHTML = ICONS.subscribe;
+              subscribeBtn.classList.remove('copied');
+            }, 2000);
+          });
           return;
         }
 
@@ -1211,8 +1223,7 @@
             <div class="name" title="${escAttr(line.name)}">${escHtml(line.name)}</div>
             <div class="actions">
               ${hasEvents ? `<button class="btn icon-btn preview-btn" data-url="${escAttr(url)}" title="${t('preview')}">${ICONS.preview}</button>` : ''}
-              <button class="btn icon-btn copy-btn" data-url="${escAttr(url)}" title="${t('copy')}">${ICONS.copy}</button>
-              <a class="btn icon-btn primary" href="${escAttr(subscribeUrl)}" target="_blank" rel="noopener" title="${t('addCal')}">${ICONS.subscribe}</a>
+              <a class="btn icon-btn primary subscribe-btn" href="${escAttr(subscribeUrl)}" data-url="${escAttr(url)}" target="_blank" rel="noopener" title="${t('addCal')}">${ICONS.subscribe}</a>
             </div>
           </div>
           ${line.termini?.length ? `<div class="termini">${line.termini.map(t => `<span>‣ ${escHtml(t)}</span>`).join('')}</div>` : ''}
@@ -1256,25 +1267,12 @@
           <td><span class="name">${escHtml(station.name)}</span>${station.commune ? `<br><span class="label">${escHtml(station.commune)}</span>` : ''}</td>
           <td class="lines">${linesBadges}</td>
           <td class="actions">
+            ${station.lat != null ? `<a class="btn icon-btn" href="https://www.openstreetmap.org/?mlat=${station.lat}&mlon=${station.lon}#map=16/${station.lat}/${station.lon}" target="_blank" rel="noopener" title="${t('showMap')}">${ICONS.location}</a>` : ''}
             <button class="btn icon-btn preview-btn${hasEvents ? '' : ' invisible'}" data-url="${escAttr(url)}" title="${t('preview')}"${hasEvents ? '' : ' disabled'}>${ICONS.preview}</button>
-            <button class="btn icon-btn copy-btn" data-url="${escAttr(url)}" title="${t('copy')}">${ICONS.copy}</button>
-            <a class="btn icon-btn primary" href="${escAttr(subscribeUrl)}" target="_blank" rel="noopener" title="${t('addCal')}">${ICONS.subscribe}</a>
+            <a class="btn icon-btn primary subscribe-btn" href="${escAttr(subscribeUrl)}" data-url="${escAttr(url)}" target="_blank" rel="noopener" title="${t('addCal')}">${ICONS.subscribe}</a>
           </td>
         </tr>
       `;
-    }
-
-    function copyUrl(btn) {
-      const url = btn.dataset.url;
-      navigator.clipboard.writeText(url).then(() => {
-        btn.innerHTML = '✓';
-        btn.classList.add('copied');
-        showToast();
-        setTimeout(() => {
-          btn.innerHTML = ICONS.copy;
-          btn.classList.remove('copied');
-        }, 2000);
-      });
     }
 
     function showToast() {
