@@ -4,7 +4,7 @@ import SQLite from "sqlite3";
 import { Util, Client } from "../lib/index.ts";
 import { CacheDB } from "../lib/client/cache.ts";
 import type * as Navitia from "../lib/client/navitia/index.ts";
-import { generateLineFeed, filterDisruptionsForLine } from "../lib/generators/line.ts";
+import { generateLineFeed, filterDisruptionsForLines } from "../lib/generators/line.ts";
 import { generateStationFeed, filterDisruptionsForStopArea } from "../lib/generators/station.ts";
 
 const LINE_PREFIX = "line:IDFM:";
@@ -226,13 +226,33 @@ async function main() {
   const timezone = linesResponse.context?.timezone ?? "Europe/Paris";
   console.error(`  Timezone: ${timezone}\n`);
 
+  // Merge RER bus variants: find Bus lines on "RER" network matching an RER line's code
+  const rerLines = lines.filter(l => l.commercial_mode?.name === "RER");
+  const rerBusVariants = new Set<string>();
+  const rerMergeIds = new Map<string, string[]>();
+  for (const rer of rerLines) {
+    const busVariant = lines.find(l =>
+      l.id !== rer.id &&
+      l.code === rer.code &&
+      l.commercial_mode?.name === "Bus" &&
+      l.network?.name === "RER"
+    );
+    if (busVariant) {
+      rerBusVariants.add(busVariant.id);
+      rerMergeIds.set(rer.id, [busVariant.id]);
+      console.error(`  Merging RER ${rer.code} bus variant ${stripLinePrefix(busVariant.id)} into ${stripLinePrefix(rer.id)}`);
+    }
+  }
+  const filteredLines = lines.filter(l => !rerBusVariants.has(l.id));
+  console.error(`  Merged ${rerBusVariants.size} RER bus variants (${lines.length} → ${filteredLines.length} lines)\n`);
+
   // Generate line feeds
   console.error("Generating line feeds...");
   let lineCount = 0;
-  for (const line of lines) {
+  for (const line of filteredLines) {
     const strippedId = stripLinePrefix(line.id);
     const filepath = Path.join(LINES_DIR, strippedId + ".ics");
-    const ical = generateLineFeed(line, allDisruptions, timezone);
+    const ical = generateLineFeed(line, allDisruptions, timezone, rerMergeIds.get(line.id));
     FS.writeFileSync(filepath, ical, "utf-8");
     lineCount++;
   }
@@ -260,16 +280,22 @@ async function main() {
   const oldestDisruption = beginDates[0] ?? null;
   const latestDisruption = endDates[endDates.length - 1] ?? null;
 
-  // Build lookup maps
+  // Build lookup maps (using filteredLines for manifest indices)
   const lineIdToIndex = new Map<string, number>();
-  lines.forEach((l, i) => lineIdToIndex.set(l.id, i));
+  filteredLines.forEach((l, i) => lineIdToIndex.set(l.id, i));
+  for (const [rerId, variantIds] of rerMergeIds) {
+    const rerIndex = lineIdToIndex.get(rerId)!;
+    for (const vid of variantIds) {
+      lineIdToIndex.set(vid, rerIndex);
+    }
+  }
 
   const stopAreaName = new Map<string, string>();
   for (const sa of stopAreas) stopAreaName.set(sa.id, sa.name);
 
   // Build network/mode lookup tables
-  const networkSet = [...new Set(lines.map(l => l.network?.name).filter(Boolean))] as string[];
-  const modeSet = [...new Set(lines.map(l => l.commercial_mode?.name).filter(Boolean))] as string[];
+  const networkSet = [...new Set(filteredLines.map(l => l.network?.name).filter(Boolean))] as string[];
+  const modeSet = [...new Set(filteredLines.map(l => l.commercial_mode?.name).filter(Boolean))] as string[];
   const networkIndex = new Map(networkSet.map((n, i) => [n, i]));
   const modeIndex = new Map(modeSet.map((m, i) => [m, i]));
 
@@ -281,8 +307,9 @@ async function main() {
     latest_disruption: latestDisruption,
     networks: networkSet,
     modes: modeSet,
-    lines: toColumnar(lines.map(l => {
-      const events = filterDisruptionsForLine(allDisruptions, l.id).length;
+    lines: toColumnar(filteredLines.map(l => {
+      const allIds = [l.id, ...(rerMergeIds.get(l.id) ?? [])];
+      const events = filterDisruptionsForLines(allDisruptions, allIds).length;
       const termini = (lineTermini?.get(l.id) ?? [])
         .sort((a, b) => b.count - a.count)
         .map(e => stopAreaName.get(e.id))
@@ -310,13 +337,15 @@ async function main() {
         la: s.coord ? parseFloat(s.coord.lat) : null,
         lo: s.coord ? parseFloat(s.coord.lon) : null,
         e: events > 0 ? events : null,
-        l: stationLines?.get(s.id)
-          ?.map(lineId => lineIdToIndex.get(lineId))
-          .filter((idx): idx is number => idx !== undefined)
-          .map(idx => ({ idx, code: lines[idx].code }))
+        l: [...new Set(
+          stationLines?.get(s.id)
+            ?.map(lineId => lineIdToIndex.get(lineId))
+            .filter((idx): idx is number => idx !== undefined)
+          ?? []
+        )]
+          .map(idx => ({ idx, code: filteredLines[idx].code }))
           .sort((a, b) => (a.code || '').localeCompare(b.code || '', undefined, { numeric: true }))
-          .map(x => x.idx)
-          ?? [],
+          .map(x => x.idx),
       };
     })),
     disruptions_count: allDisruptions.length,
