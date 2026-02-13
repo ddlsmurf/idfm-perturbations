@@ -1268,8 +1268,8 @@
           <td><span class="name">${escHtml(station.name)}</span>${station.commune ? `<br><span class="label">${escHtml(station.commune)}</span>` : ''}</td>
           <td class="lines">${linesBadges}</td>
           <td class="actions">
-            ${station.lat != null ? `<a class="btn icon-btn" href="https://www.openstreetmap.org/?mlat=${station.lat}&mlon=${station.lon}#map=16/${station.lat}/${station.lon}" target="_blank" rel="noopener" title="${t('showMap')}">${ICONS.location}</a>` : ''}
             <button class="btn icon-btn preview-btn${hasEvents ? '' : ' invisible'}" data-url="${escAttr(url)}" title="${t('preview')}"${hasEvents ? '' : ' disabled'}>${ICONS.preview}</button>
+            ${station.lat != null ? `<a class="btn icon-btn" href="https://www.openstreetmap.org/?mlat=${station.lat}&mlon=${station.lon}#map=16/${station.lat}/${station.lon}" target="_blank" rel="noopener" title="${t('showMap')}">${ICONS.location}</a>` : ''}
             <a class="btn icon-btn primary subscribe-btn" href="${escAttr(subscribeUrl)}" data-url="${escAttr(url)}" target="_blank" rel="noopener" title="${t('addCal')}">${ICONS.subscribe}</a>
           </td>
         </tr>
