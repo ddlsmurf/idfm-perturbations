@@ -582,7 +582,13 @@
       }
     };
 
-    let currentLang = localStorage.getItem('lang') || 'fr';
+    function detectLang() {
+      const stored = localStorage.getItem('lang');
+      if (stored) return stored;
+      const nav = (navigator.language || '').slice(0, 2).toLowerCase();
+      return nav === 'en' ? 'en' : 'fr';
+    }
+    let currentLang = detectLang();
 
     function t(key) {
       return TRANSLATIONS[currentLang][key] ?? TRANSLATIONS.fr[key] ?? key;
