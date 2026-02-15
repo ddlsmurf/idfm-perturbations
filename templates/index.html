@@ -379,14 +379,14 @@
         <select id="network-filter">
           <option value="" data-i18n="allNetworks">Tous les réseaux</option>
         </select>
+        <button id="locate-btn" class="locate-btn hidden" title="Sort by distance" data-i18n-title="locateTitle" data-i18n="locateBtn">📍 Près de moi</button>
+        <span id="geo-error" class="geo-error hidden"></span>
         <select id="sort">
           <option value="code" data-i18n="sortCode">Tri: Code</option>
           <option value="name" data-i18n="sortName">Tri: Nom</option>
           <option value="mode" data-i18n="sortMode">Tri: Mode</option>
           <option value="network" data-i18n="sortNetwork">Tri: Réseau</option>
         </select>
-        <button id="locate-btn" class="locate-btn hidden" title="Sort by distance" data-i18n-title="locateTitle" data-i18n="locateBtn">📍 Près de moi</button>
-        <span id="geo-error" class="geo-error hidden"></span>
       </div>
 
       <div id="message" class="message hidden"></div>
@@ -422,6 +422,9 @@
     let forceShowAll = false;
     const BASE_URL = location.href.replace(/\/[^/]*$/, '/');
     const MAX_RESULTS = 500;
+    const RADIUS_OPTIONS_M = [50, 100, 250, 500, 1000, 2000, 5000, 10000, 25000, 0];
+    const DEFAULT_RADIUS_M = 500;
+    let currentRadius_m = DEFAULT_RADIUS_M;
 
     const CALENDAR_PLATFORMS = {
       apple:   { label: { fr: 'Apple (webcal://)', en: 'Apple (webcal://)' } },
@@ -502,6 +505,7 @@
         sortDistance: "Tri: Distance",
         locateBtn: "📍 Près de moi",
         locateTitle: "Trier par distance",
+        radiusAll: "Distance: Tout",
         geoUnavailable: "La géolocalisation n'est pas disponible sur ce navigateur.",
         geoDenied: "L'accès à la position a été refusé. Vérifiez les réglages de localisation de votre navigateur.",
         geoError: "Impossible d'obtenir votre position. Vérifiez que la localisation est activée dans les réglages.",
@@ -555,6 +559,7 @@
         sortDistance: "Sort: Distance",
         locateBtn: "📍 Near me",
         locateTitle: "Sort by distance",
+        radiusAll: "Distance: All",
         geoUnavailable: "Geolocation is not available in this browser.",
         geoDenied: "Location access was denied. Check your browser's location settings.",
         geoError: "Could not get your location. Check that location services are enabled in your settings.",
@@ -798,8 +803,22 @@
         }
         sortEl.value = 'distance';
         localStorage.setItem('sort', 'distance');
-        btn.classList.add('hidden');
-        forceShowAll = true;
+        const sel = document.createElement('select');
+        sel.id = 'radius-select';
+        for (const r of RADIUS_OPTIONS_M) {
+          const opt = document.createElement('option');
+          opt.value = r;
+          const label = r === 0 ? t('radiusAll') : r < 1000 ? `${r} m` : `${r / 1000} km`;
+          opt.textContent = r === 0 ? label : `≤ ${label}`;
+          if (r === DEFAULT_RADIUS_M) opt.selected = true;
+          sel.appendChild(opt);
+        }
+        sel.addEventListener('change', () => {
+          currentRadius_m = parseInt(sel.value, 10);
+          render();
+        });
+        btn.replaceWith(sel);
+        currentRadius_m = DEFAULT_RADIUS_M;
         render();
       }, (err) => {
         const CODES = { 1: 'PERMISSION_DENIED', 2: 'POSITION_UNAVAILABLE', 3: 'TIMEOUT' };
@@ -1077,7 +1096,10 @@
       document.getElementById('mode-filter').classList.toggle('hidden', !isLines);
       document.getElementById('network-filter').classList.toggle('hidden', !isLines);
 
-      document.getElementById('locate-btn').classList.toggle('hidden', isLines || !navigator.geolocation || userLat != null);
+      const locateBtn = document.getElementById('locate-btn');
+      if (locateBtn) locateBtn.classList.toggle('hidden', isLines || !navigator.geolocation || userLat != null);
+      const radiusSel = document.getElementById('radius-select');
+      if (radiusSel) radiusSel.classList.toggle('hidden', isLines);
       const sortEl = document.getElementById('sort');
       const distOpt = sortEl.querySelector('option[value="distance"]');
       if (distOpt) distOpt.classList.toggle('hidden', isLines);
@@ -1092,7 +1114,7 @@
       const search = document.getElementById('search').value;
       const mode = document.getElementById('mode-filter').value;
       const network = document.getElementById('network-filter').value;
-      return !!(search || mode || network);
+      return !!(search || mode || network || (userLat != null && currentRadius_m > 0));
     }
 
     function searchScore(item, queryWords) {
@@ -1126,6 +1148,10 @@
         }
         return true;
       });
+
+      if (currentTab === 'stations' && userLat != null && currentRadius_m > 0) {
+        items = items.filter(s => (s._dist ?? Infinity) <= currentRadius_m);
+      }
 
       items.sort((a, b) => {
         if (words.length) {
