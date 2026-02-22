@@ -1493,6 +1493,7 @@
       const stationsCount = getFilteredItemsForTab('stations').length;
       updateTabCounts(linesCount, stationsCount);
       updateFilterCounts();
+      updateRadiusCounts();
 
       function hideStationTable() {
         document.getElementById('station-table-container')?.remove();
@@ -1641,6 +1642,20 @@
         if (opt.textContent.startsWith('──')) continue;
         const count = networkCounts.get(opt.value) || 0;
         opt.textContent = `${opt.value} (${count})`;
+      }
+    }
+
+    function updateRadiusCounts() {
+      const sel = document.getElementById('radius-select');
+      if (!sel || userLat == null) return;
+      const candidates = getFilteredItemsForTab('stations');
+      for (const opt of sel.options) {
+        const r = parseInt(opt.value, 10);
+        const label = r === 0 ? t('radiusAll') : r < 1000 ? `${r} m` : `${r / 1000} km`;
+        const count = r === 0
+          ? candidates.length
+          : candidates.filter(s => (s._dist ?? Infinity) <= r).length;
+        opt.textContent = r === 0 ? `${label} (${count})` : `≤ ${label} (${count})`;
       }
     }
 
