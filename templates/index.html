@@ -1748,7 +1748,13 @@
             const l = group[0];
             const tooltip = [l.name, l.mode, l.network].filter(Boolean).join(' · ');
             const metroClass = l.mode === 'Métro' ? ' metro' : '';
-            return `<span class="line-badge${metroClass}" data-line-idx="${l._idx}" style="background:#${l.color || '666'};color:#${decodeTextColor(l.text_color)}" title="${escAttr(tooltip)}">${escHtml(l.code)}</span>`;
+            const badge = `<span class="line-badge${metroClass}" data-line-idx="${l._idx}" style="background:#${l.color || '666'};color:#${decodeTextColor(l.text_color)}" title="${escAttr(tooltip)}">${escHtml(l.code)}</span>`;
+            const subLabel = stripCodePrefix(l.code, l.name);
+            if (subLabel && subLabel !== l.code) {
+              const c = l.color || '666';
+              return badge + `<span class="line-badge-sub" data-line-idx="${l._idx}" style="border-color:#${c};color:#${c}" title="${escAttr(l.name)}">${escHtml(subLabel)}</span>`;
+            }
+            return badge;
           }
           const first = group[0];
           const color = first.color || '666';
