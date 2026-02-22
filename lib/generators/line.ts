@@ -1,5 +1,5 @@
 import type { Disruption, PTLine } from "../client/navitia/types.ts";
-import { createCalendar, disruptionToVEvent, type VEvent, type EventContext } from "../ical.ts";
+import { createCalendar, disruptionToVEvent, MODE_ICON, type VEvent, type EventContext } from "../ical.ts";
 
 export function filterDisruptionsForLine(disruptions: Disruption[], lineId: string): Disruption[] {
   return filterDisruptionsForLines(disruptions, [lineId]);
@@ -31,11 +31,23 @@ export function generateLineFeed(
     .filter((e): e is VEvent => e !== null);
 
   const modeName = line.commercial_mode?.name ?? line.physical_modes?.[0]?.name ?? "";
+  const modeLabel = MODE_ICON[modeName] ?? modeName;
   const networkName = line.network?.name ?? "IDFM";
-  const calendarName = `${modeName} ${line.code}`.trim();
+  const OBVIOUS_NETWORK: Record<string, string> = {
+    "Métro": "RATP",
+    "Bus": "RATP",
+    "Tramway": "RATP",
+    "Funiculaire": "RATP",
+    "RER": "RER",
+    "TER": "TER",
+    "Train Transilien": "Transilien",
+    "Orlyval, CDG VAL": "ADP",
+  };
+  const networkSuffix = OBVIOUS_NETWORK[modeName] === networkName ? "" : ` (${networkName})`;
+  const calendarName = `${modeLabel} ${line.code}`.trim();
 
   return createCalendar(events, {
-    name: `${calendarName} (${networkName}) - Perturbations`,
+    name: `${calendarName}${networkSuffix} - Perturbations`,
     description: `Perturbations sur la ligne ${line.name}`,
     timezone,
   });

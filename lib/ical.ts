@@ -3,6 +3,17 @@ import type { Disruption } from "./client/navitia/types.ts";
 const CRLF = "\r\n";
 const PRODID = "-//IDFM Disruptions//ratp_to_ical//FR";
 
+export const MODE_ICON: Record<string, string> = {
+  "Métro": "Ⓜ",
+  "RER": "ʀᴇʀ",
+  "Tramway": "🚊",
+  "Bus": "в̲̅υ̲̅ѕ̲̅",
+  "TER": "𝓽𝓮𝓻",
+  "Train Transilien": "🚆",
+  "Funiculaire": "🚡",
+  "Orlyval, CDG VAL": "🛧",
+};
+
 const EFFECT_FR: Record<string, string> = {
   NO_SERVICE: "Service interrompu",
   REDUCED_SERVICE: "Service réduit",
@@ -122,12 +133,13 @@ export function disruptionToVEvent(disruption: Disruption, context?: EventContex
 
   const { modeName, lineCode, stationName } = context ?? {};
   const affected = getAffectedStations(disruption);
+  const modeLabel = modeName ? (MODE_ICON[modeName] ?? modeName) : undefined;
 
   let summary: string;
-  if (modeName && lineCode && stationName) {
-    summary = `${modeName} ${lineCode} @ ${stationName} – ${effectFr}`;
-  } else if (modeName && lineCode) {
-    summary = `${modeName} ${lineCode} – ${effectFr}`;
+  if (modeLabel && lineCode && stationName) {
+    summary = `${modeLabel} ${lineCode} @ ${stationName} – ${effectFr}`;
+  } else if (modeLabel && lineCode) {
+    summary = `${modeLabel} ${lineCode} – ${effectFr}`;
   } else if (lineCode) {
     summary = `[${lineCode}] ${effectFr}`;
   } else {
