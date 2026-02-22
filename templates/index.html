@@ -175,6 +175,7 @@
     .legend span { display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap; }
     .legend svg { width: 13.5px; height: 13.5px; min-width: 13.5px; border: 1px solid var(--accent); border-radius: 3px; padding: 0.26rem; box-sizing: content-box; color: var(--accent); opacity: 0.35; flex-shrink: 0; }
     .legend select { font-size: 0.8rem; padding: 0.15rem 0.3rem; margin-left: 0.2rem; }
+    .alarm-tip { width: 100%; text-align: center; font-size: 0.75rem; opacity: 0.7; white-space: normal !important; }
 
     /* Station table */
     .station-table {
@@ -535,6 +536,7 @@
         legendPreview: "Aperçu (visible si perturbation en cours)",
         legendSubscribe: "S'abonner via",
         legendMap: "Localiser la station",
+        alarmTip: "💡 Les événements ne déclenchent pas d'alertes par défaut, mais votre application de calendrier peut en ajouter. Pour les désactiver, allez dans les réglages de ce calendrier dans votre app et désactivez les notifications.",
         previewLoading: "Chargement...",
         updateFrequency: 'Mise à jour toutes les ~15 min aux heures de pointe (lun-sam 7h-11h, 17h-21h), ~30 min en journée, ~45 min la nuit et le dimanche (<a href="https://upptime.js.org/blog/2021/01/22/github-actions-schedule-not-working/">délais variables selon GitHub</a>)',
         footer: 'Données : <a href="https://prim.iledefrance-mobilites.fr/">IDFM PRIM</a> (API Navitia) — Hébergement offert par <a href="https://pages.cloudflare.com/">Cloudflare</a> — Moulinette offerte par <a href="https://github.com/features/actions">GitHub</a> — Aucune garantie d\'exactitude ou de disponibilité',
@@ -589,6 +591,7 @@
         legendPreview: "Preview (visible if disruption exists)",
         legendSubscribe: "Subscribe via",
         legendMap: "Locate station",
+        alarmTip: "💡 Events are set to not trigger alerts, but your calendar app may add its own. To disable, go to this calendar's settings in your app and turn off notifications.",
         previewLoading: "Loading...",
         updateFrequency: 'Updated every ~15 min during rush hours (Mon-Sat 7am-11am, 5pm-9pm), ~30 min daytime, ~45 min at night and Sundays (<a href="https://upptime.js.org/blog/2021/01/22/github-actions-schedule-not-working/">actual timing depends on GitHub</a>)',
         footer: 'Data: <a href="https://prim.iledefrance-mobilites.fr/">IDFM PRIM</a> (Navitia API) — Hosting by <a href="https://pages.cloudflare.com/">Cloudflare</a> — Processing by <a href="https://github.com/features/actions">GitHub</a> — No guarantee of accuracy or availability',
@@ -902,6 +905,7 @@
         </span>
         <span>${ICONS.preview} ${t('legendPreview')}</span>
         <span>${ICONS.location} ${t('legendMap')}</span>
+        <span class="alarm-tip">${t('alarmTip')}</span>
       `;
 
       document.getElementById('platform-select').addEventListener('change', (e) => {
