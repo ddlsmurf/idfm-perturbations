@@ -195,6 +195,11 @@ function veventToIcal(event: VEvent, timezone: string): string {
   if (event.url) {
     lines.push(`URL:${event.url}`);
   }
+  lines.push("BEGIN:VALARM");
+  lines.push("ACTION:NONE");
+  lines.push("TRIGGER;VALUE=DURATION:-PT0M");
+  lines.push("DESCRIPTION:");
+  lines.push("END:VALARM");
   lines.push("END:VEVENT");
   return lines.map(foldLine).join(CRLF);
 }
@@ -244,6 +249,7 @@ export function createCalendar(events: VEvent[], metadata: CalendarMetadata): st
     lines.push(`X-WR-CALDESC:${escapeICalText(metadata.description)}`);
   }
   lines.push(`X-WR-TIMEZONE:${metadata.timezone}`);
+  lines.push("X-APPLE-DEFAULT-ALARM:FALSE");
 
   const header = lines.map(foldLine).join(CRLF);
   const tz = timezoneComponent(metadata.timezone);
