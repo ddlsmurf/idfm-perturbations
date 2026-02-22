@@ -60,9 +60,11 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          for i in 1 2 3; do
+          attempt=0
+          for delay_s in 10 10 10 120 120 120 300 300 300; do
+            attempt=$((attempt + 1))
             npx wrangler pages deploy dist/calendars --project-name=prim2ics && exit 0
-            echo "Attempt $i failed, waiting 10s..."
-            sleep 10
+            echo "Attempt $attempt failed, retrying in ${delay_s}s..."
+            sleep $delay_s
           done
           exit 1
