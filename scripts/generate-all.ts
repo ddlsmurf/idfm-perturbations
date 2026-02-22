@@ -264,7 +264,8 @@ async function main() {
   for (const stopArea of stopAreas) {
     const strippedId = stripStopAreaPrefix(stopArea.id);
     const filepath = Path.join(STATIONS_DIR, strippedId + ".ics");
-    const ical = generateStationFeed(stopArea, allDisruptions, timezone);
+    const lineIds = new Set(stationLines?.get(stopArea.id) ?? []);
+    const ical = generateStationFeed(stopArea, allDisruptions, timezone, lineIds);
     FS.writeFileSync(filepath, ical, "utf-8");
     stationCount++;
   }
@@ -329,7 +330,8 @@ async function main() {
       };
     })),
     stations: toColumnar(stopAreas.map(s => {
-      const events = filterDisruptionsForStopArea(allDisruptions, s.id).length;
+      const lineIds = new Set(stationLines?.get(s.id) ?? []);
+      const events = filterDisruptionsForStopArea(allDisruptions, s.id, lineIds).length;
       return {
         i: stripStopAreaPrefix(s.id),
         n: s.name,

@@ -8,22 +8,23 @@ function getLineFromDisruption(disruption: Disruption) {
   return lineObject?.pt_object?.line;
 }
 
-export function filterDisruptionsForStopArea(disruptions: Disruption[], stopAreaId: string): Disruption[] {
+export function filterDisruptionsForStopArea(
+  disruptions: Disruption[],
+  stopAreaId: string,
+  stationLineIds?: Set<string>,
+): Disruption[] {
   return disruptions.filter(d =>
     d.impacted_objects?.some(io => {
       const pt = io.pt_object;
       if (!pt) return false;
-      // Direct stop_area match
       if (pt.embedded_type === "stop_area" && pt.stop_area?.id === stopAreaId) return true;
-      // stop_point belonging to this stop_area
       if (pt.embedded_type === "stop_point" && pt.stop_point?.stop_area?.id === stopAreaId) return true;
-      // Check impacted_section from/to
       if (io.impacted_section) {
         const { from, to } = io.impacted_section;
         if (from?.stop_area?.id === stopAreaId || to?.stop_area?.id === stopAreaId) return true;
       }
-      // Check impacted_stops
       if (io.impacted_stops?.some(is => is.stop_point?.stop_area?.id === stopAreaId)) return true;
+      if (stationLineIds?.size && pt.embedded_type === "line" && stationLineIds.has(pt.line?.id ?? "")) return true;
       return false;
     })
   );
@@ -33,8 +34,9 @@ export function generateStationFeed(
   stopArea: StopArea,
   disruptions: Disruption[],
   timezone: string,
+  stationLineIds?: Set<string>,
 ): string {
-  const stationDisruptions = filterDisruptionsForStopArea(disruptions, stopArea.id);
+  const stationDisruptions = filterDisruptionsForStopArea(disruptions, stopArea.id, stationLineIds);
   const events: VEvent[] = stationDisruptions
     .map(d => {
       const line = getLineFromDisruption(d);
