@@ -543,6 +543,7 @@
         legendTitle: "Boutons affichés sur chaque ligne et station ci-dessous",
         legendPreview: "Aperçu (visible si perturbation en cours)",
         legendSubscribe: "S'abonner via",
+        legendStations: "Voir les stations de la ligne",
         legendMap: "Localiser la station",
         alarmTip: "💡 Les événements ne déclenchent pas d'alertes par défaut, mais votre application de calendrier peut en ajouter. Pour les désactiver, allez dans les réglages de ce calendrier dans votre app et désactivez les notifications.",
         previewLoading: "Chargement...",
@@ -601,6 +602,7 @@
         legendTitle: "Buttons shown on each line and station below",
         legendPreview: "Preview (visible if disruption exists)",
         legendSubscribe: "Subscribe via",
+        legendStations: "Show stations on this line",
         legendMap: "Locate station",
         alarmTip: "💡 Events are set to not trigger alerts, but your calendar app may add its own. To disable, go to this calendar's settings in your app and turn off notifications.",
         previewLoading: "Loading...",
@@ -932,6 +934,7 @@
           <select id="platform-select">${platformOptions}</select>
         </span>
         <span>${ICONS.preview} ${t('legendPreview')}</span>
+        <span>${ICONS.stations} ${t('legendStations')}</span>
         <span>${ICONS.location} ${t('legendMap')}</span>
         <span class="alarm-tip">${t('alarmTip')}</span>
       `;
