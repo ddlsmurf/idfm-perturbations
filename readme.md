@@ -33,10 +33,11 @@ export IDFM_API_KEY="your-api-key-here"
 
 Generate all calendar feeds:
 ```bash
-make generate
-# or
-npm run generate
+make mapping # Updates a local cache with stations-line mappings. Needs a lot of API calls
+make generate # Requires the local cache. Updates disturbances.
 ```
+
+See [Actions](https://github.com/ddlsmurf/idfm-perturbations/actions) for example runs.
 
 Output structure:
 ```
