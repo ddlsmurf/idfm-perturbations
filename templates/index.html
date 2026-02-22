@@ -104,6 +104,8 @@
     input:focus, select:focus { outline: none; border-color: var(--accent); }
     input[type="search"] { flex: 1; min-width: 200px; }
     select { min-width: 140px; }
+    #line-filter { display: inline-flex; align-items: center; gap: 0.4rem; background: var(--bg-card); border: 1px solid var(--border); padding: 0.5rem 0.75rem; border-radius: 4px; font-size: 0.9rem; }
+    #line-filter .badge, #line-filter .badge.metro { height: 1.4em; min-width: 1.4em; width: auto; font-size: 0.8em; line-height: 1.4em; }
 
     /* Grid */
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.75rem; }
@@ -382,6 +384,7 @@
         <select id="network-filter">
           <option value="" data-i18n="allNetworks">Tous les réseaux</option>
         </select>
+        <span id="line-filter" class="hidden"></span>
         <button id="locate-btn" class="locate-btn hidden" title="Sort by distance" data-i18n-title="locateTitle" data-i18n="locateBtn">📍 Près de moi</button>
         <span id="geo-error" class="geo-error hidden"></span>
         <select id="sort">
@@ -423,6 +426,7 @@
     let data = null;
     let currentTab = 'lines';
     let forceShowAll = false;
+    let filterLineIdx = null;
     const BASE_URL = location.href.replace(/\/[^/]*$/, '/');
     const MAX_RESULTS = 500;
     const RADIUS_OPTIONS_M = [50, 100, 250, 500, 1000, 2000, 5000, 10000, 25000, 0];
@@ -465,6 +469,7 @@
       subscribe: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="12" y1="13" x2="12" y2="19"/><line x1="9" y1="16" x2="15" y2="16"/></svg>`,
       preview: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1,12 C4,4 20,4 23,12 C20,20 4,20 1,12"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg>`,
       location: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>`,
+      stations: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="20" x2="20" y2="4"/><circle cx="5" cy="19" r="2.5" fill="currentColor"/><circle cx="10" cy="14" r="1.5"/><circle cx="14.5" cy="9.5" r="1.5"/><circle cx="19" cy="5" r="2.5" fill="currentColor"/></svg>`,
     };
 
     const MODE_ICONS = {
@@ -517,6 +522,7 @@
         preview: "Aperçu",
         copied: "Copié!",
         addCal: "+ 📆",
+        showStations: "Stations de cette ligne",
         showMap: "Voir sur la carte",
         reload: "Recharger",
         status: "statut",
@@ -574,6 +580,7 @@
         preview: "Preview",
         copied: "Copied!",
         addCal: "+ 📆",
+        showStations: "Stations on this line",
         showMap: "Show on map",
         reload: "Reload",
         status: "status",
@@ -674,7 +681,8 @@
           }
           return rows;
         }
-        data.lines = fromColumnar(data.lines).map(l => ({
+        data.lines = fromColumnar(data.lines).map((l, idx) => ({
+          _idx: idx,
           id: l.i, code: l.c, name: l.n,
           network: l.w != null ? data.networks[l.w] : undefined,
           mode: l.m != null ? data.modes[l.m] : undefined,
@@ -977,6 +985,7 @@
           document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
           tab.classList.add('active');
           currentTab = tab.dataset.tab;
+          filterLineIdx = null;
           forceShowAll = false;
           updateFilterVisibility();
           render();
@@ -988,6 +997,7 @@
       document.getElementById('search').addEventListener('input', () => {
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(() => {
+          filterLineIdx = null;
           forceShowAll = false;
           render();
         }, 200);
@@ -1033,6 +1043,27 @@
               subscribeBtn.classList.remove('copied');
             }, 2000);
           });
+          return;
+        }
+
+        if (e.target.id === 'clear-line-filter') {
+          e.preventDefault();
+          filterLineIdx = null;
+          forceShowAll = false;
+          updateFilterVisibility();
+          render();
+          return;
+        }
+
+        const stationsBtn = e.target.closest('.stations-btn');
+        if (stationsBtn) {
+          e.preventDefault();
+          filterLineIdx = parseInt(stationsBtn.dataset.lineIdx, 10);
+          currentTab = 'stations';
+          forceShowAll = true;
+          document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'stations'));
+          updateFilterVisibility();
+          render();
           return;
         }
 
@@ -1170,13 +1201,29 @@
         document.getElementById('mode-filter').value = '';
         document.getElementById('network-filter').value = '';
       }
+
+      const lineFilterEl = document.getElementById('line-filter');
+      if (!isLines && filterLineIdx != null) {
+        const fl = data.lines[filterLineIdx];
+        if (fl) {
+          const bc = fl.color || '666';
+          const tc = decodeTextColor(fl.text_color);
+          const badgeCls = fl.mode === 'Métro' ? 'badge metro' : 'badge';
+          const label = stripCodePrefix(fl.code, fl.name);
+          lineFilterEl.innerHTML = `${modeIcon(fl.mode, 16)}<div class="${badgeCls}" style="background:#${bc};color:#${tc}">${escHtml(fl.code || '?')}</div>${label ? `<span>${escHtml(label)}</span>` : ''}<button id="clear-line-filter" class="btn icon-btn" style="font-size:0.8rem">✕</button>`;
+          lineFilterEl.classList.remove('hidden');
+        }
+      } else {
+        lineFilterEl.innerHTML = '';
+        lineFilterEl.classList.add('hidden');
+      }
     }
 
     function hasActiveFilters() {
       const search = document.getElementById('search').value;
       const mode = document.getElementById('mode-filter').value;
       const network = document.getElementById('network-filter').value;
-      return !!(search || mode || network || (userLat != null && currentRadius_m > 0));
+      return !!(search || mode || network || filterLineIdx != null || (userLat != null && currentRadius_m > 0));
     }
 
     function searchScore(item, queryWords) {
@@ -1201,6 +1248,10 @@
 
       if (words.length) {
         items = items.map(item => ({ ...item, _score: searchScore(item, words) })).filter(item => item._score > 0);
+      }
+
+      if (currentTab === 'stations' && filterLineIdx != null) {
+        items = items.filter(s => s.lines?.includes(filterLineIdx));
       }
 
       items = items.filter(item => {
@@ -1386,6 +1437,10 @@
 
       let items = tab === 'lines' ? data.lines : data.stations;
 
+      if (tab === 'stations' && filterLineIdx != null) {
+        items = items.filter(s => s.lines?.includes(filterLineIdx));
+      }
+
       return items.filter(item => {
         if (words.length && !searchScore(item, words)) return false;
         if (tab === 'lines') {
@@ -1433,6 +1488,7 @@
             ${lineLabelHtml(line)}
             <div class="actions">
               ${hasEvents ? `<button class="btn icon-btn preview-btn" data-url="${escAttr(url)}" title="${t('preview')}">${ICONS.preview}</button>` : ''}
+              <button class="btn icon-btn stations-btn" data-line-idx="${line._idx}" title="${t('showStations')}">${ICONS.stations}</button>
               <a class="btn icon-btn primary subscribe-btn" href="${escAttr(subscribeUrl)}" data-url="${escAttr(url)}" target="_blank" rel="noopener" title="${t('addCal')}">${ICONS.subscribe}</a>
             </div>
           </div>
