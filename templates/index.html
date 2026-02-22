@@ -993,6 +993,18 @@
       ['mode-filter', 'network-filter', 'sort'].forEach(id => {
         document.getElementById(id).addEventListener('change', () => {
           if (id === 'sort') localStorage.setItem('sort', document.getElementById(id).value);
+          if (id === 'mode-filter' || id === 'network-filter') {
+            const otherId = id === 'mode-filter' ? 'network-filter' : 'mode-filter';
+            const mine = document.getElementById(id).value;
+            const other = document.getElementById(otherId).value;
+            if (mine && other) {
+              const key = id === 'mode-filter' ? 'mode' : 'network';
+              const otherKey = id === 'mode-filter' ? 'network' : 'mode';
+              if (!data.lines.some(l => l[key] === mine && l[otherKey] === other)) {
+                document.getElementById(otherId).value = '';
+              }
+            }
+          }
           forceShowAll = false;
           render();
         });
@@ -1257,6 +1269,7 @@
       const linesCount = getFilteredItemsForTab('lines').length;
       const stationsCount = getFilteredItemsForTab('stations').length;
       updateTabCounts(linesCount, stationsCount);
+      updateFilterCounts();
 
       function hideStationTable() {
         document.getElementById('station-table-container')?.remove();
@@ -1307,6 +1320,49 @@
           grid.parentNode.insertBefore(tableContainer, grid.nextSibling);
         }
         tableContainer.innerHTML = `<table class="station-table"><tbody>${items.map(renderStationRow).join('')}</tbody></table>`;
+      }
+    }
+
+    function updateFilterCounts() {
+      if (currentTab !== 'lines') return;
+      const words = toWords(document.getElementById('search').value);
+      const modeEl = document.getElementById('mode-filter');
+      const networkEl = document.getElementById('network-filter');
+      const mode = modeEl.value;
+      const network = networkEl.value;
+
+      // Pre-filter by search
+      let searchFiltered = data.lines;
+      if (words.length) {
+        searchFiltered = searchFiltered.filter(l => searchScore(l, words));
+      }
+
+      // Count per mode (applying current network filter)
+      const modeCounts = new Map();
+      const networkFiltered = network ? searchFiltered.filter(l => l.network === network) : searchFiltered;
+      for (const l of networkFiltered) {
+        if (l.mode) modeCounts.set(l.mode, (modeCounts.get(l.mode) || 0) + 1);
+      }
+
+      // Count per network (applying current mode filter)
+      const networkCounts = new Map();
+      const modeFiltered = mode ? searchFiltered.filter(l => l.mode === mode) : searchFiltered;
+      for (const l of modeFiltered) {
+        if (l.network) networkCounts.set(l.network, (networkCounts.get(l.network) || 0) + 1);
+      }
+
+
+      for (const opt of modeEl.options) {
+        if (!opt.value) continue;
+        const count = modeCounts.get(opt.value) || 0;
+        opt.textContent = `${opt.value} (${count})`;
+      }
+
+      for (const opt of networkEl.options) {
+        if (!opt.value) continue;
+        if (opt.textContent.startsWith('──')) continue;
+        const count = networkCounts.get(opt.value) || 0;
+        opt.textContent = `${opt.value} (${count})`;
       }
     }
 
