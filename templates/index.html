@@ -50,6 +50,9 @@
     .stats { display: flex; gap: 2rem; margin-bottom: 0.75rem; font-size: 0.85rem; color: var(--text-muted); flex-wrap: wrap; justify-content: center; }
     .stats span { display: flex; align-items: center; gap: 0.3rem; }
     .stale { color: #e74c3c; font-weight: bold; }
+    #reload-btn { color: inherit; font-size: 1em; }
+    #reload-btn:hover { opacity: 0.7; }
+    #stale-status { color: #e74c3c; }
 
     /* Loading */
     .loading {
@@ -508,6 +511,8 @@
         copied: "Copié!",
         addCal: "+ 📆",
         showMap: "Voir sur la carte",
+        reload: "Recharger",
+        status: "statut",
         updatedAt: "Mis à jour le",
         lines: "lignes",
         stations: "stations",
@@ -559,6 +564,8 @@
         copied: "Copied!",
         addCal: "+ 📆",
         showMap: "Show on map",
+        reload: "Reload",
+        status: "status",
         updatedAt: "Updated on",
         lines: "lines",
         stations: "stations",
@@ -683,13 +690,48 @@
         updateFilterVisibility();
         render();
 
-        const generatedAt = new Date(data.generated_at);
-        setInterval(() => {
+        let generatedAt = new Date(data.generated_at);
+        let reloadAttempted = false;
+
+        async function tryReloadData() {
+          try {
+            const res = await fetch('index.json', { cache: 'no-cache' });
+            const fresh = await res.json();
+            const freshDate = new Date(fresh.generated_at);
+            if (freshDate > generatedAt) {
+              location.reload();
+              return true;
+            }
+          } catch (_) {}
+          return false;
+        }
+
+        const SHOW_RELOAD_AFTER_S = 15 * 60;
+
+        function updateTimeDisplay() {
           const el = document.getElementById('relative-time');
-          if (el) {
-            el.textContent = formatRelativeTime(generatedAt);
-            el.classList.toggle('stale', isStale(generatedAt));
+          if (!el) return;
+          el.textContent = formatRelativeTime(generatedAt);
+          const age_s = (Date.now() - generatedAt.getTime()) / 1000;
+          const stale = isStale(generatedAt);
+          el.classList.toggle('stale', stale);
+          const reloadEl = document.getElementById('reload-btn');
+          if (reloadEl) reloadEl.classList.toggle('hidden', age_s < SHOW_RELOAD_AFTER_S);
+          const statusEl = document.getElementById('stale-status');
+          if (statusEl) statusEl.classList.toggle('hidden', !stale);
+        }
+
+        document.getElementById('reload-btn').addEventListener('click', async (e) => {
+          e.preventDefault();
+          if (!await tryReloadData()) updateTimeDisplay();
+        });
+
+        setInterval(async () => {
+          if (isStale(generatedAt) && !reloadAttempted) {
+            reloadAttempted = true;
+            await tryReloadData();
           }
+          updateTimeDisplay();
         }, 30000);
       } catch (err) {
         loadingText.textContent = t('loadingError') + err.message;
@@ -771,12 +813,19 @@
       }, { enableHighAccuracy: true, timeout: TIMEOUT_MS, maximumAge: 300000 });
     }
 
+    const SHOW_MINUTES_UNDER_H = 6;
+
     function formatRelativeTime(date) {
       const diff_s = Math.round((Date.now() - date.getTime()) / 1000);
       if (diff_s < 60) return currentLang === 'fr' ? "à l'instant" : 'just now';
       const diff_min = Math.floor(diff_s / 60);
       if (diff_min < 60) return currentLang === 'fr' ? `il y a ${diff_min} min` : `${diff_min} min ago`;
       const diff_h = Math.floor(diff_min / 60);
+      const rem_min = diff_min % 60;
+      if (diff_h < SHOW_MINUTES_UNDER_H) {
+        const m = rem_min > 0 ? (currentLang === 'fr' ? `${String(rem_min).padStart(2, '0')}` : ` ${rem_min}m`) : '';
+        return currentLang === 'fr' ? `il y a ${diff_h}h${m}` : `${diff_h}h${m} ago`;
+      }
       if (diff_h < 24) return currentLang === 'fr' ? `il y a ${diff_h}h` : `${diff_h}h ago`;
       const diff_d = Math.floor(diff_h / 24);
       return currentLang === 'fr' ? `il y a ${diff_d}j` : `${diff_d}d ago`;
@@ -792,12 +841,14 @@
       const oldest = formatNavitiaDate(data.oldest_disruption);
       const latest = formatNavitiaDate(data.latest_disruption);
       document.getElementById('stats').innerHTML = `
-        <span>${t('updatedAt')} ${fmt} (<span id="relative-time" class="${isStale(date) ? 'stale' : ''}">${formatRelativeTime(date)}</span>)</span>
+        <span>${t('updatedAt')} ${fmt} (<span id="relative-time" class="${isStale(date) ? 'stale' : ''}">${formatRelativeTime(date)}</span><a id="reload-btn" class="hidden" href="#" title="${t('reload')}" style="margin-left:0.3rem;text-decoration:none">&#x21bb;</a><a id="stale-status" class="hidden" href="#" target="_blank" rel="noopener" style="margin-left:0.4rem">${t('status')}</a>)</span>
         <span>${data.lines.length} ${t('lines')}</span>
         <span>${data.stations.length} ${t('stations')}</span>
         <span>${data.disruptions_count} ${t('disruptions')}</span>
         <span>${t('disruptionsRange')} ${oldest} ${t('to')} ${latest}</span>
       `;
+      const s = document.getElementById('stale-status');
+      if (s) s.href = ['https://','github','.com/','ddls','murf/idfm-','perturbations/actions'].join('');
     }
 
     function renderLegend() {
