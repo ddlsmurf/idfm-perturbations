@@ -438,6 +438,7 @@
     let currentTab = 'lines';
     let forceShowAll = false;
     let filterLineIdx = null;
+    let lineSiblings = new Map();
     const BASE_URL = location.href.replace(/\/[^/]*$/, '/');
     const MAX_RESULTS = 500;
     const RADIUS_OPTIONS_M = [50, 100, 250, 500, 1000, 2000, 5000, 10000, 25000, 0];
@@ -702,6 +703,21 @@
           color: l.co, text_color: l.tc,
           events: l.e, termini: l.t,
         }));
+        // lineSiblings: idx → Set of all indices sharing same code+color+name
+        const _byKey = new Map();
+        for (const l of data.lines) {
+          const nameKey = stripAccents((l.name || '').toLowerCase());
+          const key = (l.code || '') + '|' + (l.color || '') + '|' + nameKey;
+          if (!_byKey.has(key)) _byKey.set(key, []);
+          _byKey.get(key).push(l._idx);
+        }
+        lineSiblings = new Map();
+        for (const group of _byKey.values()) {
+          if (group.length < 2) continue;
+          const set = new Set(group);
+          for (const idx of group) lineSiblings.set(idx, set);
+        }
+
         data.stations = fromColumnar(data.stations).map(s => ({
           id: s.i, name: s.n, commune: s.cm,
           lat: s.la, lon: s.lo,
@@ -1096,9 +1112,12 @@
         const lineBadge = e.target.closest('.line-badge[data-line-idx], .line-badge-sub[data-line-idx]');
         if (lineBadge) {
           e.preventDefault();
-          const line = data.lines[parseInt(lineBadge.dataset.lineIdx, 10)];
+          const idx = parseInt(lineBadge.dataset.lineIdx, 10);
+          const line = data.lines[idx];
           if (!line) return;
-          showLineCard(line);
+          const siblings = lineSiblings.get(idx);
+          const lines = siblings ? [...siblings].map(i => data.lines[i]).filter(Boolean) : [line];
+          showLineCards(lines);
           return;
         }
       });
@@ -1155,10 +1174,10 @@
       return date.toLocaleString(locale, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
     }
 
-    function showLineCard(line) {
+    function showLineCards(lines) {
       const modal = document.getElementById('preview-modal');
-      document.getElementById('preview-title').textContent = line.name;
-      document.getElementById('preview-body').innerHTML = renderLineCard(line);
+      document.getElementById('preview-title').textContent = lines[0].name;
+      document.getElementById('preview-body').innerHTML = lines.map(renderLineCard).join('');
       modal.classList.remove('hidden');
     }
 
@@ -1235,6 +1254,13 @@
       }
     }
 
+    function stationMatchesLineFilter(station) {
+      if (filterLineIdx == null) return true;
+      const siblings = lineSiblings.get(filterLineIdx);
+      if (!siblings) return station.lines?.includes(filterLineIdx);
+      return station.lines?.some(idx => siblings.has(idx));
+    }
+
     function hasActiveFilters() {
       const search = document.getElementById('search').value;
       const mode = document.getElementById('mode-filter').value;
@@ -1273,7 +1299,7 @@
       }
 
       if (currentTab === 'stations' && filterLineIdx != null) {
-        items = items.filter(s => s.lines?.includes(filterLineIdx));
+        items = items.filter(stationMatchesLineFilter);
       }
 
       items = items.filter(item => {
@@ -1460,7 +1486,7 @@
       let items = tab === 'lines' ? data.lines : data.stations;
 
       if (tab === 'stations' && filterLineIdx != null) {
-        items = items.filter(s => s.lines?.includes(filterLineIdx));
+        items = items.filter(stationMatchesLineFilter);
       }
 
       return items.filter(item => {
@@ -1562,7 +1588,13 @@
           const first = group[0];
           const color = first.color || '666';
           const main = `<span class="line-badge" style="background:#${color};color:#${decodeTextColor(first.text_color)}" title="${escAttr(first.code)}">${escHtml(first.code)}</span>`;
-          const subs = group.map(l => {
+          const seen = new Set();
+          const subs = group.filter(l => {
+            const label = stripAccents((stripCodePrefix(l.code, l.name) || l.name).toLowerCase());
+            if (seen.has(label)) return false;
+            seen.add(label);
+            return true;
+          }).map(l => {
             const label = stripCodePrefix(l.code, l.name) || l.name;
             return `<span class="line-badge-sub" data-line-idx="${l._idx}" style="border-color:#${color};color:#${color}" title="${escAttr(l.name)}">${escHtml(label)}</span>`;
           }).join('');
