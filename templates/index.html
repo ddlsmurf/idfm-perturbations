@@ -85,11 +85,12 @@
       color: var(--text-muted);
       cursor: pointer;
       font-size: 0.95rem;
+      font-weight: 500;
       border-bottom: 2px solid transparent;
       transition: all 0.2s;
     }
-    .tab:hover { color: var(--text); }
-    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab:hover { color: var(--text); background: color-mix(in srgb, var(--text) 5%, transparent); }
+    .tab.active { color: var(--accent); font-weight: 600; border-bottom-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
 
     /* Controls */
     .controls { display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; }
@@ -101,10 +102,11 @@
       border-radius: 4px;
       font-size: 0.9rem;
     }
-    input:focus, select:focus { outline: none; border-color: var(--accent); }
+    input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+    .filter-active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--bg-card)); }
     input[type="search"] { flex: 1; min-width: 200px; }
     select { min-width: 140px; }
-    #line-filter { display: inline-flex; align-items: center; gap: 0.4rem; background: var(--bg-card); border: 1px solid var(--border); padding: 0.5rem 0.75rem; border-radius: 4px; font-size: 0.9rem; }
+    #line-filter { display: inline-flex; align-items: center; gap: 0.4rem; border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--bg-card)); padding: 0.5rem 0.75rem; border-radius: 4px; font-size: 0.9rem; }
     #line-filter .badge, #line-filter .badge.metro { height: 1.4em; min-width: 1.4em; width: auto; font-size: 0.8em; line-height: 1.4em; }
 
     /* Grid */
@@ -921,6 +923,8 @@
           }
           sel.addEventListener('change', () => {
             currentRadius_m = parseInt(sel.value, 10);
+            if (currentRadius_m > 0) document.getElementById('sort').value = 'distance';
+            updateFilterVisibility();
             render();
           });
           btn.replaceWith(sel);
@@ -1059,6 +1063,7 @@
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(() => {
           forceShowAll = false;
+          updateFilterVisibility();
           render();
         }, 200);
       });
@@ -1080,6 +1085,7 @@
             }
           }
           forceShowAll = false;
+          updateFilterVisibility();
           render();
         });
       });
@@ -1282,6 +1288,12 @@
         lineFilterEl.innerHTML = '';
         lineFilterEl.classList.add('hidden');
       }
+
+      document.getElementById('search').classList.toggle('filter-active', !!document.getElementById('search').value);
+      document.getElementById('mode-filter').classList.toggle('filter-active', !!document.getElementById('mode-filter').value);
+      document.getElementById('network-filter').classList.toggle('filter-active', !!document.getElementById('network-filter').value);
+      const radiusEl = document.getElementById('radius-select');
+      if (radiusEl) radiusEl.classList.toggle('filter-active', parseInt(radiusEl.value, 10) > 0);
     }
 
     function stationMatchesLineFilter(station) {
