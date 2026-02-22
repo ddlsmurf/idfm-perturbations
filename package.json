@@ -1,0 +1,26 @@
+{
+  "name": "ratp_to_ical",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "scripts": {
+    "run": "node --no-warnings --experimental-transform-types index.ts | pino-pretty",
+    "generate": "node --no-warnings --experimental-transform-types scripts/generate-all.ts",
+    "mapping": "node --no-warnings --experimental-transform-types scripts/generate-line-station-mapping.ts"
+  },
+  "author": "",
+  "license": "MIT",
+  "description": "IDFM transport disruption calendar feeds",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.9.2",
+    "pino-pretty": "^13.1.2"
+  },
+  "dependencies": {
+    "moment-timezone": "^0.6.0",
+    "pino": "^10.1.0",
+    "sqlite3": "^5.1.7"
+  }
+}

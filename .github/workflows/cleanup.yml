@@ -1,0 +1,23 @@
+name: Cleanup Old Workflow Runs
+
+on:
+  schedule:
+    - cron: '13 1/6 * * *'  # Every 6 hours
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete old successful runs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh run list --workflow deploy.yml --limit 500 --json databaseId,createdAt,status,conclusion \
+            --jq '[.[] | select(.status=="completed" and .conclusion=="success" and (.createdAt | fromdateiso8601) < (now - 2*86400))] | .[20:] | .[].databaseId' \
+            | xargs -r -I {} gh run delete {}

@@ -1,0 +1,1290 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calendriers des perturbations Île-de-France Mobilités</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='none' stroke='%234a9eff' stroke-width='2.5'/><path d='M9 22 L9 10 L16 17 L23 10 L23 22' fill='none' stroke='%234a9eff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/><circle cx='26' cy='6' r='6' fill='%23ef4444'/></svg>">
+  <style>
+    :root {
+      --bg: #1a1a1a;
+      --bg-card: #252525;
+      --bg-hover: #333;
+      --text: #e0e0e0;
+      --text-muted: #888;
+      --accent: #4a9eff;
+      --border: #333;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+    .container { max-width: 1200px; margin: 0 auto; padding: 1rem; }
+    header { padding: 1.5rem 0; border-bottom: 1px solid var(--border); margin-bottom: 1rem; position: relative; }
+    h1 { font-size: 1.5rem; font-weight: 600; }
+    .lang-toggle {
+      position: absolute;
+      top: 1.5rem;
+      right: 0;
+      display: flex;
+      background: var(--bg-card);
+      border-radius: 1rem;
+      padding: 0.15rem;
+      cursor: pointer;
+    }
+    .lang-btn {
+      background: none;
+      border: none;
+      border-radius: 0.85rem;
+      padding: 0.25rem 0.5rem;
+      font-size: 0.9rem;
+      opacity: 0.4;
+      transition: opacity 0.2s, background 0.2s;
+      pointer-events: none;
+    }
+    .lang-toggle:hover .lang-btn { opacity: 0.7; }
+    .lang-btn.active { opacity: 1; background: var(--bg-hover); }
+    .stats { display: flex; gap: 2rem; margin-bottom: 0.75rem; font-size: 0.85rem; color: var(--text-muted); flex-wrap: wrap; justify-content: center; }
+    .stats span { display: flex; align-items: center; gap: 0.3rem; }
+    .stale { color: #e74c3c; font-weight: bold; }
+
+    /* Loading */
+    .loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 4rem;
+      color: var(--text-muted);
+    }
+    .loading .spinner {
+      width: 2rem;
+      height: 2rem;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-bottom: 1rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Tabs */
+    .tabs { display: flex; gap: 0; margin-bottom: 1rem; border-bottom: 1px solid var(--border); }
+    .tab {
+      padding: 0.75rem 1.5rem;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.95rem;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    /* Controls */
+    .controls { display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; }
+    input, select {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.5rem 0.75rem;
+      border-radius: 4px;
+      font-size: 0.9rem;
+    }
+    input:focus, select:focus { outline: none; border-color: var(--accent); }
+    input[type="search"] { flex: 1; min-width: 200px; }
+    select { min-width: 140px; }
+
+    /* Grid */
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.75rem; }
+    .card {
+      background: var(--bg-card);
+      border-radius: 6px;
+      padding: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      transition: background 0.15s;
+    }
+    .card:hover { background: var(--bg-hover); }
+    .card-row { display: flex; align-items: center; gap: 0.75rem; }
+    .card-row-bottom { display: flex; align-items: center; justify-content: space-between; }
+
+    /* Line badge */
+    .badge {
+      min-width: 2.5rem;
+      height: 2.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+      padding: 0 0.5rem;
+    }
+    .badge.metro {
+      border-radius: 50%;
+      min-width: 2.5rem;
+      width: 2.5rem;
+      padding: 0;
+    }
+    .card .name { font-weight: 500; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .card .meta { font-size: 0.8rem; color: var(--text-muted); display: flex; align-items: center; }
+    .card .meta img { width: 16px; height: 16px; margin-right: 0.25rem; flex-shrink: 0; }
+    .card .event-count { font-size: 0.75rem; color: var(--text-muted); white-space: nowrap; }
+    .card .termini { font-size: 0.75rem; color: var(--text-muted); font-style: italic; display: flex; flex-direction: column; }
+    .card .termini span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .locate-btn { background: none; border: 1px solid var(--border); border-radius: 0.4rem; cursor: pointer; font-size: 0.85rem; padding: 0.3rem 0.5rem; line-height: 1; color: var(--text); }
+    .geo-error { color: #c00; font-size: 0.8rem; }
+
+    /* Actions */
+    .actions { display: flex; gap: 0.4rem; }
+    .btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 0.35rem 0.5rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.75rem;
+      transition: all 0.15s;
+      text-decoration: none;
+    }
+    .btn:hover { border-color: var(--accent); color: var(--accent); }
+    .btn.copied { border-color: #4ade80; color: #4ade80; }
+    .icon-btn { width: 30px; height: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-color: var(--accent); color: var(--accent); opacity: 0.6; }
+    .icon-btn:hover { background: var(--accent); color: var(--bg); opacity: 1; }
+    .icon-btn.primary { opacity: 1; }
+    .icon-btn svg { display: block; }
+
+    /* Legend */
+    .legend { display: flex; gap: 1rem 1.5rem; margin-bottom: 1rem; font-size: 0.8rem; color: var(--text-muted); flex-wrap: wrap; justify-content: center; align-items: center; border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem 1rem; }
+    .legend-title { width: 100%; text-align: center; font-size: 0.75rem; opacity: 0.7; }
+    .legend span { display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap; }
+    .legend svg { width: 13.5px; height: 13.5px; min-width: 13.5px; border: 1px solid var(--accent); border-radius: 3px; padding: 0.26rem; box-sizing: content-box; color: var(--accent); opacity: 0.35; flex-shrink: 0; }
+    .legend select { font-size: 0.8rem; padding: 0.15rem 0.3rem; margin-left: 0.2rem; }
+
+    /* Station table */
+    .station-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .station-table tr {
+      border-bottom: 1px solid var(--border);
+    }
+    .station-table tr:hover {
+      background: var(--bg-hover);
+    }
+    .station-table td {
+      padding: 0.5rem 0.75rem;
+      vertical-align: middle;
+    }
+    .station-table .name { font-weight: 500; }
+    .station-table .label { color: var(--text-muted); font-size: 0.85rem; }
+    .station-table .lines { max-width: 300px; }
+    .station-table .line-badge {
+      display: inline-block;
+      padding: 0.15rem 0.4rem;
+      border-radius: 3px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      margin: 0.1rem 0.2rem 0.1rem 0;
+      cursor: pointer;
+    }
+    .station-table .line-badge.metro {
+      border-radius: 50%;
+      min-width: 1.4rem;
+      width: 1.4rem;
+      height: 1.4rem;
+      padding: 0;
+      text-align: center;
+      line-height: 1.4rem;
+    }
+    .station-table .mode-group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.1rem; margin-right: 0.5rem; }
+    .station-table .mode-group > img { width: 14px; height: 14px; flex-shrink: 0; margin-right: 0.15rem; }
+    .station-table .actions { text-align: right; white-space: nowrap; display: flex; justify-content: flex-end; gap: 0.4rem; }
+
+    /* Empty / message states */
+    .empty, .message {
+      text-align: center;
+      padding: 3rem;
+      color: var(--text-muted);
+    }
+
+    /* Footer */
+    footer {
+      margin-top: 3rem;
+      padding: 1.5rem 0;
+      border-top: 1px solid var(--border);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-align: center;
+    }
+    footer a { color: var(--accent); }
+    footer p { margin: 0.3rem 0; }
+    .message a {
+      color: var(--accent);
+      cursor: pointer;
+      text-decoration: underline;
+    }
+    .message a:hover { color: #6fb3ff; }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 1rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #4ade80;
+      color: #000;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      opacity: 0;
+      transition: opacity 0.2s;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; }
+
+    /* Count badge */
+    .count {
+      background: var(--bg-hover);
+      padding: 0.15rem 0.5rem;
+      border-radius: 10px;
+      font-size: 0.75rem;
+      margin-left: 0.5rem;
+    }
+
+    .hidden { display: none !important; }
+    .invisible { visibility: hidden; }
+
+    /* Modal */
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .modal.hidden { display: none; }
+    .modal-content {
+      background: var(--bg-card);
+      border-radius: 8px;
+      max-width: 600px;
+      max-height: 80vh;
+      width: 90%;
+      overflow: hidden;
+    }
+    .modal-header {
+      padding: 1rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .modal-header h2 { font-size: 1.1rem; font-weight: 600; }
+    .modal-body { padding: 1rem; overflow-y: auto; max-height: 60vh; }
+    .modal-close {
+      background: none;
+      border: none;
+      color: var(--text);
+      font-size: 1.5rem;
+      cursor: pointer;
+      line-height: 1;
+    }
+    .modal-close:hover { color: var(--accent); }
+    .event-item {
+      margin-bottom: 1rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .event-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+    .event-item strong { display: block; margin-bottom: 0.25rem; }
+    .event-item small { color: var(--text-muted); }
+    .event-desc { margin: 0.5rem 0 0; font-size: 0.85rem; color: var(--text-muted); }
+
+    @media (max-width: 600px) {
+      .tab { display: flex; flex-direction: column; align-items: center; gap: 0.15rem; }
+      .tab .count { margin-left: 0; }
+      .legend { justify-content: flex-start; }
+      .controls { flex-direction: column; }
+      input, select { font-size: 16px; }
+      input[type="search"], select { width: 100%; }
+      .locate-btn { padding: 0.5rem 0.75rem; font-size: 16px; }
+      .grid { grid-template-columns: 1fr; }
+      .card { padding: 0.5rem; max-width: 100%; overflow: hidden; }
+      .card-row { gap: 0.5rem; max-width: 100%; }
+      .card .name { min-width: 0; flex: 1; }
+      .card-row-bottom { flex-wrap: wrap; }
+      .card .event-count { width: 100%; text-align: left; margin-top: 0.25rem; }
+      .actions { gap: 0.25rem; flex-shrink: 0; }
+      .btn { padding: 0.25rem 0.4rem; font-size: 0.7rem; }
+      .badge { min-width: 2rem; height: 2rem; font-size: 0.8rem; }
+      .badge.metro { min-width: 2rem; width: 2rem; }
+
+      .station-table tr { display: flex; flex-wrap: wrap; padding: 0.5rem 0; }
+      .station-table td { display: block; padding: 0.25rem 0.5rem; border: none; }
+      .station-table td:first-child { flex: 1; min-width: 0; }
+      .station-table td.actions { flex-shrink: 0; }
+      .station-table td.lines { width: 100%; padding-left: 1rem; order: 3; }
+
+      .stats { gap: 0.5rem 1rem; font-size: 0.75rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="lang-toggle">
+        <button class="lang-btn active" data-lang="fr" title="Français">🇫🇷</button>
+        <button class="lang-btn" data-lang="en" title="English">🇬🇧</button>
+      </div>
+      <h1 data-i18n="heading">Perturbations Île-de-France Mobilités</h1>
+      <p style="font-size:1.1rem;margin-top:0.5rem;" data-i18n="tagline">Ajoutez les perturbations d'une ligne ou station à votre application calendrier.</p>
+      <p style="color:var(--text-muted);margin-top:0.5rem;font-size:0.9rem;" data-i18n-html="intro">Abonnez-vous à une ligne pour recevoir tous les événements la concernant, ou à une station pour les événements de toutes les lignes qui la desservent.</p>
+    </header>
+
+    <div class="legend" id="legend"></div>
+
+    <div id="loading" class="loading">
+      <div class="spinner"></div>
+      <div id="loading-text" data-i18n="loading">Chargement des données...</div>
+    </div>
+
+    <div id="app" class="hidden">
+      <div class="tabs">
+        <button class="tab active" data-tab="lines"><span data-i18n="tabLines">Lignes</span> <span class="count" id="lines-count">0</span></button>
+        <button class="tab" data-tab="stations"><span data-i18n="tabStations">Stations</span> <span class="count" id="stations-count">0</span></button>
+      </div>
+
+      <div class="controls">
+        <input type="search" id="search" data-i18n-placeholder="search" placeholder="Rechercher...">
+        <select id="mode-filter">
+          <option value="" data-i18n="allModes">Tous les modes</option>
+        </select>
+        <select id="network-filter">
+          <option value="" data-i18n="allNetworks">Tous les réseaux</option>
+        </select>
+        <select id="sort">
+          <option value="code" data-i18n="sortCode">Tri: Code</option>
+          <option value="name" data-i18n="sortName">Tri: Nom</option>
+          <option value="mode" data-i18n="sortMode">Tri: Mode</option>
+          <option value="network" data-i18n="sortNetwork">Tri: Réseau</option>
+        </select>
+        <button id="locate-btn" class="locate-btn hidden" title="Sort by distance" data-i18n-title="locateTitle" data-i18n="locateBtn">📍 Près de moi</button>
+        <span id="geo-error" class="geo-error hidden"></span>
+      </div>
+
+      <div id="message" class="message hidden"></div>
+      <div class="grid" id="grid"></div>
+      <div class="empty hidden" id="empty" data-i18n="noResults">Aucun résultat</div>
+    </div>
+
+    <footer>
+      <div class="stats" id="stats"></div>
+      <p data-i18n="duplicateCaveat">Les lignes et stations peuvent apparaître en doublons — c'est normal, les données sources les traitent comme des entités distinctes.</p>
+      <p data-i18n-html="updateFrequency">Mise à jour toutes les ~15 min aux heures de pointe (lun-sam 7h-11h, 17h-21h), ~30 min en journée, ~45 min la nuit et le dimanche (<a href="https://upptime.js.org/blog/2021/01/22/github-actions-schedule-not-working/">délais variables selon GitHub</a>)</p>
+      <p data-i18n-html="footer">
+        Données : <a href="https://prim.iledefrance-mobilites.fr/">IDFM PRIM</a> (API Navitia) — Hébergement offert par <a href="https://pages.cloudflare.com/">Cloudflare</a> — Moulinette offerte par <a href="https://github.com/features/actions">GitHub</a> — Aucune garantie d'exactitude ou de disponibilité
+      </p>
+    </footer>
+  </div>
+
+  <div class="toast" id="toast" data-i18n="urlCopied">URL copiée</div>
+
+  <div id="preview-modal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="preview-title">Aperçu</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div id="preview-body" class="modal-body"></div>
+    </div>
+  </div>
+
+  <script>
+    let data = null;
+    let currentTab = 'lines';
+    let forceShowAll = false;
+    const BASE_URL = location.href.replace(/\/[^/]*$/, '/');
+    const MAX_RESULTS = 500;
+
+    const CALENDAR_PLATFORMS = {
+      apple:   { label: { fr: 'Apple (webcal://)', en: 'Apple (webcal://)' } },
+      google:  { label: { fr: 'Google Agenda', en: 'Google Calendar' } },
+      outlook: { label: { fr: 'Outlook',       en: 'Outlook' } },
+    };
+
+    function detectDefaultPlatform() {
+      const ua = navigator.userAgent;
+      if (/iPhone|iPad|iPod|Macintosh|Mac OS/.test(ua)) return 'apple';
+      if (/Android/.test(ua)) return 'google';
+      if (/Windows/.test(ua)) return 'outlook';
+      return 'apple';
+    }
+
+    let currentPlatform = localStorage.getItem('calendarPlatform') || detectDefaultPlatform();
+
+    function getSubscribeUrl(httpsUrl) {
+      switch (currentPlatform) {
+        case 'apple':
+          return httpsUrl.replace(/^https?:/, 'webcal:');
+        case 'google':
+          return 'https://calendar.google.com/calendar/r?cid=' + encodeURIComponent(httpsUrl);
+        case 'outlook':
+          return 'https://outlook.live.com/calendar/0/addfromweb?url=' + encodeURIComponent(httpsUrl);
+        default:
+          throw new Error(`Unknown calendar platform: ${JSON.stringify(currentPlatform)}, expected one of: ${JSON.stringify(Object.keys(CALENDAR_PLATFORMS))}`);
+      }
+    }
+
+    const ICONS = {
+      copy: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="11" height="10" rx="5"/><rect x="11" y="7" width="11" height="10" rx="5"/></svg>`,
+      subscribe: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="12" y1="13" x2="12" y2="19"/><line x1="9" y1="16" x2="15" y2="16"/></svg>`,
+      preview: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1,12 C4,4 20,4 23,12 C20,20 4,20 1,12"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/></svg>`,
+    };
+
+    const MODE_ICONS = {
+      'Métro': 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyODMuNDYgMjgzLjQ2Ij4KCTxjaXJjbGUgY3g9IjE0MS43MyIgY3k9IjE0MS43MyIgcj0iMTMyLjUxNSIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjRkZGIiBzdHJva2Utd2lkdGg9IjE4LjQzIi8+Cgk8cGF0aCBmaWxsPSIjRkZGIiBkPSJNMjEyLjI1LDIwNS4xNVY4MS41YzAtNy4wOS0zLjktMTQuNTMtMTUuNi0xNC41My04Ljg1LDAtMTIuNCwzLjktMTYuMjksMTEuNjlsLTM4LjI3LDc5LjczaC0uMzVMMTAzLjExLDc4LjY2Qzk5LjIxLDcwLjg3LDk1LjY3LDY3LDg2LjgxLDY3LDc1LjEyLDY3LDcxLjIyLDc0LjQxLDcxLjIyLDgxLjVWMjA1LjE1YzAsNi43NCw1LjMyLDEwLjY0LDExLjcsMTAuNjQsNS42NiwwLDEyLTMuOSwxMi0xMC42NFYxMTNoLjM2TDEzMC40LDE4NC42YzIuNDcsNSw1LjY3LDcuOCwxMS4zNCw3LjhzOC44NS0yLjg0LDExLjMzLTcuOEwxODguMTUsMTEzaC4zNnY5Mi4xMmMwLDYuNzQsNi4zNywxMC42NCwxMi4wNSwxMC42NCw2LjM3LDAsMTEuNjktMy45LDExLjY5LTEwLjY0Ii8+Cjwvc3ZnPgo=',
+      'RER': 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyODMuNDYgMjgzLjQ2Ij4KCTxyZWN0IHdpZHRoPSIyNjUuMDE1IiBoZWlnaHQ9IjI2NS4wMTUiIHJ4PSI1NC41NjUiIHg9IjkuMjIyNSIgeT0iOS4yMjI1IiBmaWxsPSJub25lIiBzdHJva2U9IiNGRkYiIHN0cm9rZS13aWR0aD0iMTguNDQ1Ii8+Cgk8cGF0aCBmaWxsPSIjRkZGIiBkPSJNMjQzLjQzLDExOS43N2MwLTE5LjEzLTE0LjE4LTI4LTI4LTI4SDE4OC44NmMtNSwwLTcuNzksMy44OS03Ljc5LDguMTVWMTgzLjJjMCw1LDUsNy40Myw5LjU2LDcuNDMsNS4zMiwwLDkuNTctMi40Nyw5LjU3LTcuNDNWMTUxaDguMTVsMTUuOTQsMzUuNzhhNyw3LDAsMCwwLDYuNzQsMy44OWM1LjY2LDAsMTMuODItNS4zMSwxMC42My0xMS42OGwtMTUuMjQtMzEuODljOS4yMS00LjYyLDE3LTEyLjc2LDE3LTI3LjI5TTE3MS41LDE4MS40MmMwLTQuMjYtMi44NC04Ljg1LTcuOC04Ljg1SDEzNi43N1YxNDguMTJoMjIuMzJhNy45Myw3LjkzLDAsMCwwLDcuOC04LjE1YzAtNC4yNS0yLjg0LTguMTYtNy44LTguMTZIMTM2Ljc3VjEwOS40OWgyNC44MWM1LDAsNy43OS01LDcuNzktOC44NSwwLTQuMjYtMi44My04Ljg2LTcuNzktOC44NkgxMjUuNDNjLTUsMC03Ljc5LDMuODktNy43OSw4LjE1djgyLjkxYzAsNSw1LDcuNDQsOS41Nyw3LjQ0SDE2My43YzUsMCw3LjgtNSw3LjgtOC44Nm0tNjUuMjEtNjEuNjVjMC0xOS4xMy0xNC4xNi0yOC0yOC0yOEg1MS43M2MtNC45NSwwLTcuNzksMy44OS03Ljc5LDguMTVWMTgzLjJjMCw1LDUsNy40Myw5LjU2LDcuNDMsNS4zMSwwLDkuNTYtMi40Nyw5LjU2LTcuNDNWMTUxaDguMTZsMTYsMzUuNzhhNyw3LDAsMCwwLDYuNzMsMy44OWM1LjY3LDAsMTMuODEtNS4zMSwxMC42My0xMS42OEw4OS4yOSwxNDcuMDZjOS4yMi00LjYyLDE3LTEyLjc2LDE3LTI3LjI5bTExNy4yOSwyLjEzYzAsMTItMTEsMTQuODctMTcuNzEsMTQuODdIMjAwLjJ2LTI4LjdoNi43MmM4Ljg3LDAsMTYuNjYsMy45MSwxNi42NiwxMy44M20tMTM3LjEyLDBjMCwxMi0xMSwxNC44Ny0xNy43MiwxNC44N0g2My4wNnYtMjguN2g2Ljc1YzguODUsMCwxNi42NSwzLjkxLDE2LjY1LDEzLjgzIi8+Cjwvc3ZnPgo=',
+      'Train Transilien': 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyODMuNDYgMjgzLjQ2Ij4KCTxyZWN0IHdpZHRoPSIyNjUuMDE1IiBoZWlnaHQ9IjI2NS4wMTUiIHJ4PSI1NC41NjUiIHg9IjkuMjIyNSIgeT0iOS4yMjI1IiBmaWxsPSJub25lIiBzdHJva2U9IiNGRkYiIHN0cm9rZS13aWR0aD0iMTguNDQ1Ii8+Cgk8cGF0aCBmaWxsPSIjRkZGIiBkPSJNMTgzLjg3LDIwNC42YTEzLjI3LDEzLjI3LDAsMCwwLDEuNjctMS4yOWM1LjA5LTQuMTMsOS44NS0xMC40NSwxMy4zMS0yMC4yNSw0LjgzLTEzLjczLDguMjQtMjYsOS4xOC00MS4xMiwxLjMxLTE4LjYtNi4zNS00Ny41My0xMS40My02MWwtMS43Ny00Ljc1Yy0xLjA5LTMtNS4yNi05LjQ3LTEyLjY1LTE3LjE4LTYuMzYtNi42Mi0xMi40Ny03LjExLTIxLjc3LTcuMTFIMTIyLjY1Yy05LjMsMC0xNS40LjQ5LTIxLjc3LDcuMTEtNy40LDcuNjgtMTEuNTcsMTQuMTUtMTIuNjUsMTcuMThsLTEuNzgsNC43OEM4MS4zNyw5NC40MSw3My43MiwxMjMuMzQsNzUsMTQyYy45NCwxNS4wNiw0LjM2LDI3LjMxLDkuMjEsNDEuMDksMy40NSw5LjgyLDguMiwxNi4xMiwxMy4zLDIwLjI1YTE2Ljg4LDE2Ljg4LDAsMCwwLDEuNjksMS4yN2wtMjcuNSwzMC41OGE2Ljg3LDYuODcsMCwwLDAsMCw5LDUuMzEsNS4zMSwwLDAsMCw4LjA2LDBsOS41LTEwLjU0SDE5My44bDkuNDgsMTAuNTRhNS4zMiw1LjMyLDAsMCwwLDguMDcsMCw2Ljg5LDYuODksMCwwLDAsMC05Wm0tOS4yMy0xMS4xNWE5LjQ0LDkuNDQsMCwxLDEsOS40NS05LjQ1LDkuNDYsOS40NiwwLDAsMS05LjQ1LDkuNDVNODkuMTYsMTMyLjljLTUuNzcsMCwzLjMtNTAuNjYsNy40My01MC42Nmg4OC44NWM0LjQ5LDAsMTUsNTAuNjYsOCw1MC42NlpNOTguNzgsMTg0YTkuNDUsOS40NSwwLDEsMSw5LjQ1LDkuNDVBOS40NCw5LjQ0LDAsMCwxLDk4Ljc4LDE4NG0xLjkyLDM2LjksMTAuMTItMTEuMjVhNTUuNjUsNTUuNjUsMCwwLDAsMTIuOCwxLjEzaDM1LjgyYTU1LjU3LDU1LjU3LDAsMCwwLDEyLjc5LTEuMTNsMTAuMTMsMTEuMjVaIi8+Cjwvc3ZnPgo=',
+      'Tramway': 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyODMuNDYgMjgzLjQ2Ij4KCTxyZWN0IGZpbGw9IiNGRkYiIHdpZHRoPSIyODMuNDYiIGhlaWdodD0iMTguNDMiIHJ4PSI5LjIxIi8+Cgk8cmVjdCBmaWxsPSIjRkZGIiB3aWR0aD0iMjgzLjQ2IiBoZWlnaHQ9IjE4LjQzIiByeD0iOS4yMSIgeT0iMjY1LjA0Ii8+Cgk8cGF0aCBmaWxsPSIjRkZGIiBkPSJNMjguMzUsMjEyLjZoMTg1LjdhNDEuNTUsNDEuNTUsMCwwLDAsMzcuNTQtMjMuNDEsMzUuNDIsMzUuNDIsMCwwLDAsMy4xNy0yMC41NiwxMTEuODksMTExLjg5LDAsMCwwLTI4LjQxLTYwLjM5LDI3LjY3LDI3LjY3LDAsMCwwLTIwLjQzLTloLTk4TDEyOC40Nyw4Mi4zYTUsNSwwLDAsMCwwLTcuNjZMOTIuMzMsNDVhMy4yMSwzLjIxLDAsMCwwLTQuNTIuNDRsLTIsMi40OGEzLjIyLDMuMjIsMCwwLDAsLjQ0LDQuNTNMMTE4LDc4LjQ3LDkyLjcyLDk5LjIxSDI4LjM1VjExMkg2OS41OWEyLDIsMCwwLDEsMiwyVjE2OC44YTIsMiwwLDAsMS0yLDJIMjguMzVabTE4OC40OC05NS44OGE5OS4zLDk5LjMsMCwwLDEsMjIuOTQsNDEuOWMxLjc3LDYuNy0yLjM2LDEyLjE3LTkuMywxMi4xN0gxNzEuMzVhMiwyLDAsMCwxLTItMlYxMTRhMiwyLDAsMCwxLDItMmgzNC41N2ExNC43OSwxNC43OSwwLDAsMSwxMC45MSw0Ljc1bS02Mi4yLDgzLjEySDEyOC44NGEyLDIsMCwwLDEtMi0yVjExNGEyLDIsMCwwLDEsMi0yaDI1Ljc5YTIsMiwwLDAsMSwyLDJ2ODMuOTFhMiwyLDAsMCwxLTIsMk04Ni4zMSwxMTJoMjUuOGEyLDIsMCwwLDEsMiwydjgzLjkxYTIsMiwwLDAsMS0yLDJIODYuMzFhMiwyLDAsMCwxLTItMlYxMTRhMiwyLDAsMCwxLDItMk0yNTEuMTUsMjM1Ljg0SDI4LjM1di0xMS45aDIyMi44YTQsNCwwLDAsMSw0LDR2NGE0LDQsMCwwLDEtNCw0Ii8+Cjwvc3ZnPgo=',
+      'Bus': 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyODMuNDYgMjgzLjQ2Ij4KCTxyZWN0IGZpbGw9IiNGRkYiIHdpZHRoPSIyODMuNDYiIGhlaWdodD0iMTguNDMiIHJ4PSI5LjIxIi8+Cgk8cmVjdCBmaWxsPSIjRkZGIiB3aWR0aD0iMjgzLjQ2IiBoZWlnaHQ9IjE4LjQzIiByeD0iOS4yMSIgeT0iMjY1LjA0Ii8+Cgk8cGF0aCBmaWxsPSIjRkZGIiBkPSJNMjQ0LjE0LDE2MS4yMmMwLTE0LjUzLTguMTYtMjMtMTguNDMtMjguN2wtNy44LTQuMjVjLTQuNi0yLjQ5LTguNS02LjM4LTguNS0xMS4zNCwwLTUuNjcsNC42MS05LjU3LDExLjM0LTkuNTcsNC42MSwwLDguODUsMS43NywxMiwzLjE5LDUsMi40OCw4LjE2LS43MSw5LjU3LTYsMS43OC02LS43MS04LjE1LTUtMTAuMjhhMzgsMzgsMCwwLDAtMTYuMjktMy41NGMtMTYuNjYsMC0zMC40OCwxMS0zMC40OCwyOC43LDAsMTMuODIsNy4wOCwyMS42MSwxOC40MywyOEwyMTcuMiwxNTJjNSwyLjgzLDguMTYsNi43Myw4LjE2LDEyLDAsNi43NC02LjM4LDkuOTItMTIuNzYsOS45Mi01LDAtMTEtMi4xMi0xNC4xOC0zLjU0LTUuMzEtMi40OC04LjE0LjcxLTkuOTIsNi4zOC0xLjc2LDYsMS4wNyw4LjUxLDUuNjcsMTAuNjMsNC4yNSwyLjEzLDExLjcsMy45LDE4LjQzLDMuOSwxNy4zNiwwLDMxLjU0LTExLjcsMzEuNTQtMzAuMTJtLTYyLTMuNTVWOTguODZjMC01LTUtNy40NC05LjU3LTcuNDQtNSwwLTkuNTcsMi40OC05LjU3LDcuNDRWMTU1LjJjMCwxMS4zNC0zLjU0LDE4Ljc3LTEyLjc1LDE4Ljc3LTguODYsMC0xMy4xMS03LjA0LTEzLjExLTE4Ljc3Vjk4Ljg2YzAtNS01LjMyLTcuNDQtOS45My03LjQ0LTUuMzEsMC05LjkyLDIuNDgtOS45Miw3LjQ0djU4LjQ2YzAsMjMuMzksMTEuNywzNCwzMywzNCwxOS4xMywwLDMxLjg5LTExLDMxLjg5LTMzLjY3bS03NC4wNiw0LjI2YzAtMTYuMy0xMS4zMy0yMi4zMy0xNy4zNi0yMy4zOXYtLjM1YzcuMDgtMy41NSwxNS41OS0xMC4yOCwxNS41OS0yMi4zMywwLTE2LjI5LTE0LjE3LTI0LjA5LTI4LTI0LjA5SDUxLjczYy01LDAtNy43OSwzLjktNy43OSw4LjE1djgyLjkxYzAsNSw1LDcuNDUsOS41Nyw3LjQ1SDc4LjY2YzE1LjI0LDAsMjkuNDEtOC4xNiwyOS40MS0yOC4zNU04Ni40NiwxMjAuNDdjMCw5LjIxLTcuOCwxMi40LTE1Ljk1LDEyLjRINjMuMDd2LTI0LjhoNy40NGM4LjUsMCwxNS45NSwyLjgzLDE1Ljk1LDEyLjRtMi44MywzOS4zM0M4OS4yOSwxNjkuMzcsODQsMTc0LDcyLjY0LDE3NEg2NC4xM1YxNDYuMzRoOC41MWM3LjA4LDAsMTYuNjUsMi40OCwxNi42NSwxMy40NiIvPgo8L3N2Zz4K',
+      'Funiculaire': 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyODMuNDYgMjgzLjQ2Ij4KCTxyZWN0IGZpbGw9IiNGRkYiIHdpZHRoPSIyODMuNDYiIGhlaWdodD0iMTguNDMiIHJ4PSI5LjIxIi8+Cgk8cmVjdCBmaWxsPSIjRkZGIiB3aWR0aD0iMjgzLjQ2IiBoZWlnaHQ9IjE4LjQzIiByeD0iOS4yMSIgeT0iMjY1LjA0Ii8+Cgk8cGF0aCBmaWxsPSIjRkZGIiBkPSJNMjMzLjU4LDU4LjM3LDIzMyw1NS4xOWEzLjIxLDMuMjEsMCwwLDAtMy43Mi0yLjZMMTYyLjY3LDY0LjM0bC0uMy0xLjY4YTcuOTMsNy45MywwLDAsMC05LjE5LTYuNDNsLTI2LjI0LDQuNjJhNy45NCw3Ljk0LDAsMCwwLTYuNDQsOS4ybC4zLDEuNjdMNTQuMTYsODMuNDdhMy4yMSwzLjIxLDAsMCwwLTIuNiwzLjcxbC41NiwzLjE4QTMuMjIsMy4yMiwwLDAsMCw1NS44NCw5M2w4MS4wNy0xNC4yOXYzNC43Mkg5OGEyNy41MiwyNy41MiwwLDAsMC0yNS41LDE3LDExMi44NSwxMTIuODUsMCwwLDAsMCw4Ni40MiwyNy41MywyNy41MywwLDAsMCwyNS41LDE3aDg3LjQzYTI3LjUzLDI3LjUzLDAsMCwwLDI1LjUtMTcsMTEyLjk1LDExMi45NSwwLDAsMCwwLTg2LjQxLDI3LjUyLDI3LjUyLDAsMCwwLTI1LjUtMTdoLTM4LjlWNzdMMjMxLDYyLjA4QTMuMjEsMy4yMSwwLDAsMCwyMzMuNTgsNTguMzdaTTExMi4xMSwxODQuODNoLTMzYTIsMiwwLDAsMS0yLTEuNzlxLS40NC00LjY2LS40NC05LjQyYTk5LjEzLDk5LjEzLDAsMCwxLDcuNjItMzguMzFBMTQuODEsMTQuODEsMCwwLDEsOTgsMTI2LjE0aDE0LjA5YTIsMiwwLDAsMSwyLDJ2NTQuNzFBMiwyLDAsMCwxLDExMi4xMSwxODQuODNabTU3LjI2LTJWMTI4LjEzYTIsMiwwLDAsMSwyLTJoMTQuMWExNC44MiwxNC44MiwwLDAsMSwxMy43Miw5LjE3LDk5LjEzLDk5LjEzLDAsMCwxLDcuNjIsMzguMzFxMCw0Ljc1LS40NCw5LjQyYTIsMiwwLDAsMS0yLDEuNzloLTMzQTIsMiwwLDAsMSwxNjkuMzcsMTgyLjg0Wk0xNTQuNjMsMjIxLjFIMTI4Ljg0YTIsMiwwLDAsMS0yLTJ2LTkxYTIsMiwwLDAsMSwyLTJoMjUuNzlhMiwyLDAsMCwxLDIsMnY5MUEyLDIsMCwwLDEsMTU0LjYzLDIyMS4xWiIvPgo8L3N2Zz4K',
+      'TER': 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzOTguOSAxOTMuNCI+Cgk8cGF0aCBmaWxsPSIjMDM0RUEyIiBzdHJva2U9IiNGRkYiIHN0cm9rZS13aWR0aD0iNSIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZD0iTTE0My4yLDE0NC42YzAtMS4yLDAuMS0yLjQsMC40LTMuNmMxLjUtNyw2LjktMTQuMywxMy45LTE4LjZjMjIuMi0xMy42LDQwLjYtOS42LDQzLjMtOC4xCgkJYzAuMywwLjIsMC4xLDAuNC0wLjEsMC45Yy0yLjUsNi40LTI1LjYsMjYuNy01NS4yLDM3LjVDMTQ0LjEsMTUwLjQsMTQzLjIsMTQ3LjMsMTQzLjIsMTQ0LjYgTTIyMCwxMDcuNGMtMi44LTMuMS0xMC4yLTYuNS0yMC4yLTguMQoJCWMtOS43LTEuNS0yOS44LTIuNi01MS42LDguNmMtMjIuOCwxMS43LTM3LjUsMzMuNC0zMC45LDU0YzAuMSwwLTE5LjIsNy4xLTMzLjYsNC4yYy03LjgtMS42LTE1LjEtNy4zLTE3LjQtMTUKCQljLTMuNi0xMS44LTAuNi0zMiwxOS42LTUwLjRjMjYuNy0yNC40LDY2LjgtMzMuMSw4My45LTM2LjhjNy45LTEuNyw4LjktMiw5LjEtMy4xYzAuMS0wLjUsMC40LTIuMy0xLjItNC4yCgkJYy0yLjQtMi44LTkuMy01LjgtMjguMy0zLjhDMTI5LjgsNTUsMTAzLDYyLjksOTUsNjUuNGM1LjUtMTEuNSwyMi41LTQyLjEsMjUuNS00Ny45YzQuOS05LjQsNi43LTEzLjQsNi43LTE1LjYKCQljMC0wLjYtMC4yLTEuMS0wLjUtMS40Yy0yLjgtMi42LTE4LjgsNi4xLTMxLDIwLjVDODMuNCwzNS40LDc2LjksNDcsNjcuMiw2Mi4yYy0xMC43LDE3LTQ0LjMsMjUuNi02MC41LDMwYy00LjMsMS4yLTUuNiwxLjQtNi4yLDIKCQljLTAuNSwwLjYtMC43LDEuNC0wLjUsMi4yYzEuNCw0LjgsOS42LDkuOSwxOC4xLDEwLjNjNi4yLDAuMywxMy41LTAuNywyNS0zLjljLTYuMSw5LjctMTYuNSwzMS4yLTE2LjUsNTEuNgoJCWMwLDE1LjksNy4zLDM0LjgsMzguNCwzNy44YzI0LjUsMi4zLDQ4LjItNi40LDY0LjktMTIuOGMxOC44LDE0LjYsNDQuNCwxMy44LDQ0LjUsMTMuOGM2NS43LDAsOTYuMi01Mi42LDEwMS44LTYyLjQKCQljMCwwLjEsNiwxOS42LDE3LjUsMzUuNGMxNS43LDIxLjcsMzcuNSwyOC41LDU5LjgsMjYuNGMyNi41LTIuNSw0My42LTIzLDQ1LjItMjYuOGMwLjgtMS45LDAtMy45LTQuOS0xLjMKCQljLTQuMSwyLjItOC42LDUuNS0xOS42LDcuNmMtNDkuMiw5LjMtNjMuOS00MS44LTc0LjQtNjMuN2MtMS40LTMuMS0yLjctNS40LTQuMS02Yy0zLTEuMi0yNi4yLDIuOS0yOC43LDcuOAoJCWMtMjUuOCw0OC01OS40LDU4LjctODQuOCw1OS4xYy04LjUsMC4xLTE1LjctMS42LTIxLjQtNC42YzEwLTQuOSwxNy04LjcsMjQuMi0xMy41YzI2LjQtMTcuNiwzNi0zNi40LDM2LTQyLjUKCQlDMjIwLjgsMTA4LjMsMjIwLjUsMTA3LjksMjIwLDEwNy40eiIvPgo8L3N2Zz4K',
+      'Orlyval, CDG VAL': 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9Ii0wLjI2MiAtMC42NyA1MyA1MyI+Cgk8cmVjdCB4PSIwLjI1IiB5PSIwLjI1IiByeD0iNiIgcnk9IjYiIGZpbGw9IiNGRkNDMkMiIHN0cm9rZT0iIzkzOTU5OCIgc3Ryb2tlLXdpZHRoPSIwLjUiIHdpZHRoPSI1MS4zMTQiIGhlaWdodD0iNTEuMzE1Ii8+Cgk8cG9seWxpbmUgZmlsbD0iIzkzOTU5OCIgcG9pbnRzPSI1LjQ5Niw0My4zODUgNS40OTYsMzYuNTQxIDI1Ljc3NSwxNi4yMzMgMjUuNzc1LDI4LjQ1NiA1LjQ5Niw0My4zODUiLz4KCTxwb2x5bGluZSBmaWxsPSIjOTM5NTk4IiBwb2ludHM9IjQ2LjA0Niw0My4zODUgNDYuMDQ2LDM2LjU0MSAyNS43NzUsMTYuMjMzIDI1Ljc3NSwyOC40NTYgNDYuMDQ2LDQzLjM4NSIvPgoJPHBvbHlsaW5lIGZpbGw9IiM5Mzk1OTgiIHBvaW50cz0iMjAuMjI5LDQ3LjMyNSAyMC4yMjksNDMuODY1IDI1Ljc3NSwzOC4xODYgMjUuNzc1LDQ1LjAyMSAyMC4yMjksNDcuMzI1Ii8+Cgk8cG9seWxpbmUgZmlsbD0iIzkzOTU5OCIgcG9pbnRzPSIzMS4zMTMsNDcuMzI1IDMxLjMxMyw0My44NjUgMjUuNzc1LDM4LjE4NiAyNS43NzUsNDUuMDIxIDMxLjMxMyw0Ny4zMjUiLz4KCTxwYXRoIGZpbGw9IiM5Mzk1OTgiIGQ9Ik0yNS43ODUsNDUuMTE1YzEuNDE5LDAsMi40OTEtMS4xNTYsMi40OTEtMi42MDRWNi45OTFjMC0xLjM1NC0xLjA3Mi0yLjUtMi40OTEtMi41CgkJYy0xLjQxLDAtMi41NjcsMS4xNDctMi41NjcsMi41djM1LjUyMUMyMy4yMTgsNDMuOTU5LDI0LjM3NSw0NS4xMTUsMjUuNzg1LDQ1LjExNSIvPgo8L3N2Zz4K',
+    };
+
+    const MODE_ORDER = ['Métro', 'RER', 'Train Transilien', 'Tramway', 'Bus', 'Funiculaire', 'TER', 'Orlyval, CDG VAL'];
+
+    function modeIcon(mode, size) {
+      const uri = MODE_ICONS[mode];
+      if (!uri) return '';
+      return `<img src="${uri}" width="${size}" height="${size}" alt="${escAttr(mode)}" title="${escAttr(mode)}">`;
+    }
+
+    const TRANSLATIONS = {
+      fr: {
+        heading: "Perturbations Île-de-France Mobilités",
+        tagline: "Ajoutez les perturbations d'une ligne ou station à votre calendrier.",
+        intro: "Abonnez-vous à une ligne pour recevoir tous les événements la concernant, ou à une station pour les événements de toutes les lignes qui la desservent.",
+        duplicateCaveat: "Les lignes et stations peuvent apparaître en doublons — c'est normal, les données sources les traitent comme des entités distinctes.",
+        loading: "Chargement des données...",
+        loadingProcess: "Traitement des données...",
+        loadingDisplay: "Préparation de l'affichage...",
+        loadingError: "Erreur de chargement: ",
+        tabLines: "Lignes",
+        tabStations: "Stations",
+        search: "Rechercher...",
+        allModes: "Tous les modes",
+        allNetworks: "Tous les réseaux",
+        sortCode: "Tri: Code",
+        sortName: "Tri: Nom",
+        sortMode: "Tri: Mode",
+        sortNetwork: "Tri: Réseau",
+        sortDistance: "Tri: Distance",
+        locateBtn: "📍 Près de moi",
+        locateTitle: "Trier par distance",
+        geoUnavailable: "La géolocalisation n'est pas disponible sur ce navigateur.",
+        geoDenied: "L'accès à la position a été refusé. Vérifiez les réglages de localisation de votre navigateur.",
+        geoError: "Impossible d'obtenir votre position. Vérifiez que la localisation est activée dans les réglages.",
+        noResults: "Aucun résultat",
+        urlCopied: "URL copiée",
+        preview: "Aperçu",
+        copy: "Copier",
+        copied: "Copié!",
+        addCal: "+ 📆",
+        updatedAt: "Mis à jour le",
+        lines: "lignes",
+        stations: "stations",
+        disruptions: "perturbations",
+        disruptionsRange: "Perturbations du",
+        to: "au",
+        available: "disponibles. Utilisez la recherche ou les filtres pour affiner.",
+        resultsHint: "résultats. Affinez votre recherche pour de meilleurs résultats.",
+        showAll: "Afficher tout de même",
+        oneDisruption: "1 perturbation",
+        nDisruptions: "perturbations",
+        noDisruption: "Aucune perturbation",
+        legendTitle: "Boutons affichés sur chaque ligne et station ci-dessous",
+        legendPreview: "Aperçu (visible si perturbation en cours)",
+        legendCopy: "Copier le lien .ics",
+        legendSubscribe: "S'abonner via",
+        previewLoading: "Chargement...",
+        updateFrequency: 'Mise à jour toutes les ~15 min aux heures de pointe (lun-sam 7h-11h, 17h-21h), ~30 min en journée, ~45 min la nuit et le dimanche (<a href="https://upptime.js.org/blog/2021/01/22/github-actions-schedule-not-working/">délais variables selon GitHub</a>)',
+        footer: 'Données : <a href="https://prim.iledefrance-mobilites.fr/">IDFM PRIM</a> (API Navitia) — Hébergement offert par <a href="https://pages.cloudflare.com/">Cloudflare</a> — Moulinette offerte par <a href="https://github.com/features/actions">GitHub</a> — Aucune garantie d\'exactitude ou de disponibilité',
+        title: "Calendriers des perturbations Île-de-France Mobilités"
+      },
+      en: {
+        heading: "Île-de-France Mobilités Disruptions",
+        tagline: "Add disruptions for a line or station to your calendar app.",
+        intro: "Subscribe to a line to receive all related events, or to a station to get events from all lines serving it.",
+        duplicateCaveat: "Lines and stations may appear as duplicates — this is normal, source data treats them as distinct entities.",
+        loading: "Loading data...",
+        loadingProcess: "Processing data...",
+        loadingDisplay: "Preparing display...",
+        loadingError: "Loading error: ",
+        tabLines: "Lines",
+        tabStations: "Stations",
+        search: "Search...",
+        allModes: "All modes",
+        allNetworks: "All networks",
+        sortCode: "Sort: Code",
+        sortName: "Sort: Name",
+        sortMode: "Sort: Mode",
+        sortNetwork: "Sort: Network",
+        sortDistance: "Sort: Distance",
+        locateBtn: "📍 Near me",
+        locateTitle: "Sort by distance",
+        geoUnavailable: "Geolocation is not available in this browser.",
+        geoDenied: "Location access was denied. Check your browser's location settings.",
+        geoError: "Could not get your location. Check that location services are enabled in your settings.",
+        noResults: "No results",
+        urlCopied: "URL copied",
+        preview: "Preview",
+        copy: "Copy",
+        copied: "Copied!",
+        addCal: "+ 📆",
+        updatedAt: "Updated on",
+        lines: "lines",
+        stations: "stations",
+        disruptions: "disruptions",
+        disruptionsRange: "Disruptions from",
+        to: "to",
+        available: "available. Use search or filters to refine.",
+        resultsHint: "results. Refine your search for better results.",
+        showAll: "Show all anyway",
+        oneDisruption: "1 disruption",
+        nDisruptions: "disruptions",
+        noDisruption: "No disruptions",
+        legendTitle: "Buttons shown on each line and station below",
+        legendPreview: "Preview (visible if disruption exists)",
+        legendCopy: "Copy .ics link",
+        legendSubscribe: "Subscribe via",
+        previewLoading: "Loading...",
+        updateFrequency: 'Updated every ~15 min during rush hours (Mon-Sat 7am-11am, 5pm-9pm), ~30 min daytime, ~45 min at night and Sundays (<a href="https://upptime.js.org/blog/2021/01/22/github-actions-schedule-not-working/">actual timing depends on GitHub</a>)',
+        footer: 'Data: <a href="https://prim.iledefrance-mobilites.fr/">IDFM PRIM</a> (Navitia API) — Hosting by <a href="https://pages.cloudflare.com/">Cloudflare</a> — Processing by <a href="https://github.com/features/actions">GitHub</a> — No guarantee of accuracy or availability',
+        title: "Île-de-France Mobilités Disruption Calendars"
+      }
+    };
+
+    let currentLang = localStorage.getItem('lang') || 'fr';
+
+    function t(key) {
+      return TRANSLATIONS[currentLang][key] ?? TRANSLATIONS.fr[key] ?? key;
+    }
+
+    function setLanguage(lang) {
+      currentLang = lang;
+      localStorage.setItem('lang', lang);
+      document.documentElement.lang = lang;
+      document.title = t('title');
+
+      document.querySelectorAll('.lang-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.lang === lang);
+      });
+
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        el.textContent = t(el.dataset.i18n);
+      });
+      document.querySelectorAll('[data-i18n-html]').forEach(el => {
+        el.innerHTML = t(el.dataset.i18nHtml);
+      });
+      document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        el.placeholder = t(el.dataset.i18nPlaceholder);
+      });
+      document.querySelectorAll('[data-i18n-title]').forEach(el => {
+        el.title = t(el.dataset.i18nTitle);
+      });
+
+      if (data) {
+        renderStats();
+        renderLegend();
+        render();
+      }
+    }
+
+    async function init() {
+      setLanguage(currentLang);
+      renderLegend();
+
+      document.querySelector('.lang-toggle').addEventListener('click', () => {
+        setLanguage(currentLang === 'fr' ? 'en' : 'fr');
+      });
+
+      const loadingText = document.getElementById('loading-text');
+
+      try {
+        loadingText.textContent = t('loading');
+        const res = await fetch('index.json');
+
+        loadingText.textContent = t('loadingProcess');
+        data = await res.json();
+
+        // Convert columnar format to row objects, expand short keys and resolve lookups
+        function fromColumnar(cols) {
+          const keys = Object.keys(cols);
+          const len = cols[keys[0]].length;
+          const rows = new Array(len);
+          for (let j = 0; j < len; j++) {
+            const row = {};
+            for (const k of keys) row[k] = cols[k][j];
+            rows[j] = row;
+          }
+          return rows;
+        }
+        data.lines = fromColumnar(data.lines).map(l => ({
+          id: l.i, code: l.c, name: l.n,
+          network: l.w != null ? data.networks[l.w] : undefined,
+          mode: l.m != null ? data.modes[l.m] : undefined,
+          color: l.co, text_color: l.tc,
+          events: l.e, termini: l.t,
+        }));
+        data.stations = fromColumnar(data.stations).map(s => ({
+          id: s.i, name: s.n, commune: s.cm,
+          lat: s.la, lon: s.lo,
+          events: s.e, lines: s.l,
+        }));
+
+        loadingText.textContent = t('loadingDisplay');
+        await new Promise(r => setTimeout(r, 50));
+
+        renderStats();
+        renderLegend();
+        populateFilters();
+        bindEvents();
+
+        const savedSort = localStorage.getItem('sort');
+        if (savedSort && savedSort !== 'distance') document.getElementById('sort').value = savedSort;
+
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('app').classList.remove('hidden');
+
+        updateFilterVisibility();
+        render();
+
+        const generatedAt = new Date(data.generated_at);
+        setInterval(() => {
+          const el = document.getElementById('relative-time');
+          if (el) {
+            el.textContent = formatRelativeTime(generatedAt);
+            el.classList.toggle('stale', isStale(generatedAt));
+          }
+        }, 30000);
+      } catch (err) {
+        loadingText.textContent = t('loadingError') + err.message;
+      }
+    }
+
+    function formatNavitiaDate(str) {
+      if (!str) return '—';
+      const y = str.slice(0, 4), m = str.slice(4, 6), d = str.slice(6, 8);
+      const locale = currentLang === 'en' ? 'en-GB' : 'fr-FR';
+      return new Date(`${y}-${m}-${d}`).toLocaleDateString(locale, {
+        day: 'numeric', month: 'short', year: 'numeric'
+      });
+    }
+
+    const STALE_THRESHOLD_S = 3 * 3600;
+
+    function isStale(date) {
+      return (Date.now() - date.getTime()) / 1000 > STALE_THRESHOLD_S;
+    }
+
+    let userLat = null, userLon = null;
+
+    function haversine(lat1, lon1, lat2, lon2) {
+      const R = 6371e3;
+      const toRad = d => d * Math.PI / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    function requestGeolocation() {
+      const btn = document.getElementById('locate-btn');
+      if (!navigator.geolocation) {
+        console.error('[geo] navigator.geolocation not available');
+        const geoErr = document.getElementById('geo-error');
+        geoErr.textContent = t('geoUnavailable');
+        geoErr.classList.remove('hidden');
+        return;
+      }
+      console.log('[geo] requesting position...');
+      btn.textContent = '⏳ ...';
+      btn.disabled = true;
+      const TIMEOUT_MS = 30000;
+      navigator.geolocation.getCurrentPosition(pos => {
+        console.log('[geo] success:', pos.coords.latitude, pos.coords.longitude);
+        document.getElementById('geo-error').classList.add('hidden');
+        userLat = pos.coords.latitude;
+        userLon = pos.coords.longitude;
+        for (const s of data.stations) {
+          s._dist = (s.lat != null && s.lon != null)
+            ? haversine(userLat, userLon, s.lat, s.lon)
+            : Infinity;
+        }
+        const sortEl = document.getElementById('sort');
+        if (!sortEl.querySelector('option[value="distance"]')) {
+          const opt = document.createElement('option');
+          opt.value = 'distance';
+          opt.setAttribute('data-i18n', 'sortDistance');
+          opt.textContent = t('sortDistance');
+          sortEl.appendChild(opt);
+        }
+        sortEl.value = 'distance';
+        localStorage.setItem('sort', 'distance');
+        btn.classList.add('hidden');
+        forceShowAll = true;
+        render();
+      }, (err) => {
+        const CODES = { 1: 'PERMISSION_DENIED', 2: 'POSITION_UNAVAILABLE', 3: 'TIMEOUT' };
+        console.error('[geo] error:', CODES[err.code] || err.code, err.message);
+        btn.textContent = t('locateBtn');
+        btn.disabled = false;
+        const msg = err.code === 1 ? t('geoDenied') : t('geoError');
+        const geoErr = document.getElementById('geo-error');
+        geoErr.textContent = msg;
+        geoErr.classList.remove('hidden');
+      }, { enableHighAccuracy: true, timeout: TIMEOUT_MS, maximumAge: 300000 });
+    }
+
+    function formatRelativeTime(date) {
+      const diff_s = Math.round((Date.now() - date.getTime()) / 1000);
+      if (diff_s < 60) return currentLang === 'fr' ? "à l'instant" : 'just now';
+      const diff_min = Math.floor(diff_s / 60);
+      if (diff_min < 60) return currentLang === 'fr' ? `il y a ${diff_min} min` : `${diff_min} min ago`;
+      const diff_h = Math.floor(diff_min / 60);
+      if (diff_h < 24) return currentLang === 'fr' ? `il y a ${diff_h}h` : `${diff_h}h ago`;
+      const diff_d = Math.floor(diff_h / 24);
+      return currentLang === 'fr' ? `il y a ${diff_d}j` : `${diff_d}d ago`;
+    }
+
+    function renderStats() {
+      const date = new Date(data.generated_at);
+      const locale = currentLang === 'en' ? 'en-GB' : 'fr-FR';
+      const fmt = date.toLocaleString(locale, {
+        day: 'numeric', month: 'long', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      });
+      const oldest = formatNavitiaDate(data.oldest_disruption);
+      const latest = formatNavitiaDate(data.latest_disruption);
+      document.getElementById('stats').innerHTML = `
+        <span>${t('updatedAt')} ${fmt} (<span id="relative-time" class="${isStale(date) ? 'stale' : ''}">${formatRelativeTime(date)}</span>)</span>
+        <span>${data.lines.length} ${t('lines')}</span>
+        <span>${data.stations.length} ${t('stations')}</span>
+        <span>${data.disruptions_count} ${t('disruptions')}</span>
+        <span>${t('disruptionsRange')} ${oldest} ${t('to')} ${latest}</span>
+      `;
+    }
+
+    function renderLegend() {
+      const platformOptions = Object.entries(CALENDAR_PLATFORMS)
+        .map(([key, p]) => {
+          const selected = key === currentPlatform ? ' selected' : '';
+          return `<option value="${key}"${selected}>${escHtml(p.label[currentLang] || p.label.en)}</option>`;
+        })
+        .join('');
+
+      document.getElementById('legend').innerHTML = `
+        <div class="legend-title">${t('legendTitle')}</div>
+        <span>${ICONS.subscribe} ${t('legendSubscribe')}
+          <select id="platform-select">${platformOptions}</select>
+        </span>
+        <span>${ICONS.copy} ${t('legendCopy')}</span>
+        <span>${ICONS.preview} ${t('legendPreview')}</span>
+      `;
+
+      document.getElementById('platform-select').addEventListener('change', (e) => {
+        currentPlatform = e.target.value;
+        localStorage.setItem('calendarPlatform', currentPlatform);
+        render();
+      });
+    }
+
+    function populateFilters() {
+      const modes = [...new Set(data.lines.map(l => l.mode).filter(Boolean))].sort();
+      const networks = [...new Set(data.lines.map(l => l.network).filter(Boolean))].sort();
+
+      const modeSelect = document.getElementById('mode-filter');
+      modes.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m;
+        opt.textContent = m;
+        modeSelect.appendChild(opt);
+      });
+
+      const pinnedNetworks = ['RATP', 'RER', 'TER', 'Transilien'];
+
+      const networkSelect = document.getElementById('network-filter');
+      // Add pinned networks first
+      pinnedNetworks.forEach(n => {
+        const opt = document.createElement('option');
+        opt.value = n;
+        opt.textContent = n;
+        networkSelect.appendChild(opt);
+      });
+      // Separator
+      const sep = document.createElement('option');
+      sep.disabled = true;
+      sep.textContent = '───────────';
+      networkSelect.appendChild(sep);
+      // All networks alphabetically
+      networks.forEach(n => {
+        const opt = document.createElement('option');
+        opt.value = n;
+        opt.textContent = n;
+        networkSelect.appendChild(opt);
+      });
+    }
+
+    function bindEvents() {
+      document.querySelectorAll('.tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+          tab.classList.add('active');
+          currentTab = tab.dataset.tab;
+          forceShowAll = false;
+          updateFilterVisibility();
+          render();
+        });
+      });
+
+      // Search: debounced input for real-time filtering
+      let searchTimeout;
+      document.getElementById('search').addEventListener('input', () => {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+          forceShowAll = false;
+          render();
+        }, 200);
+      });
+
+      // Dropdowns: use 'change' only
+      ['mode-filter', 'network-filter', 'sort'].forEach(id => {
+        document.getElementById(id).addEventListener('change', () => {
+          if (id === 'sort') localStorage.setItem('sort', document.getElementById(id).value);
+          forceShowAll = false;
+          render();
+        });
+      });
+
+      document.getElementById('locate-btn').addEventListener('click', requestGeolocation);
+
+
+
+      // Event delegation for buttons
+      document.addEventListener('click', (e) => {
+        const copyBtn = e.target.closest('.copy-btn');
+        if (copyBtn) {
+          e.preventDefault();
+          copyUrl(copyBtn);
+          return;
+        }
+
+        const previewBtn = e.target.closest('.preview-btn');
+        if (previewBtn) {
+          e.preventDefault();
+          const url = previewBtn.dataset.url;
+          const card = previewBtn.closest('.card, tr');
+          const title = card?.querySelector('.name')?.textContent || 'Aperçu';
+          showPreview(url, title);
+          return;
+        }
+
+        const lineBadge = e.target.closest('.line-badge[data-line-idx]');
+        if (lineBadge) {
+          e.preventDefault();
+          const line = data.lines[parseInt(lineBadge.dataset.lineIdx, 10)];
+          if (!line) return;
+          showLineCard(line);
+          return;
+        }
+      });
+
+      // Modal close handlers
+      const modal = document.getElementById('preview-modal');
+      modal.querySelector('.modal-close').addEventListener('click', closeModal);
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) closeModal();
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
+      });
+    }
+
+    function closeModal() {
+      document.getElementById('preview-modal').classList.add('hidden');
+    }
+
+    function parseICS(text) {
+      const events = [];
+      const EVENT_REGEX = /BEGIN:VEVENT[\s\S]*?END:VEVENT/g;
+      let match;
+      while ((match = EVENT_REGEX.exec(text)) !== null) {
+        const event = {};
+        // Unfold continuation lines (lines starting with space/tab)
+        const unfolded = match[0].replace(/\r?\n[ \t]/g, '');
+        const lines = unfolded.split(/\r?\n/);
+        for (const line of lines) {
+          if (line.startsWith('SUMMARY:')) event.summary = unescapeICS(line.slice(8));
+          if (line.startsWith('DESCRIPTION:')) event.description = unescapeICS(line.slice(12));
+          if (line.startsWith('DTSTART')) event.start = parseICSDate(line);
+          if (line.startsWith('DTEND')) event.end = parseICSDate(line);
+        }
+        if (event.summary) events.push(event);
+      }
+      return events;
+    }
+
+    function unescapeICS(str) {
+      return str.replace(/\\n/g, '\n').replace(/\\,/g, ',').replace(/\\;/g, ';').replace(/\\\\/g, '\\');
+    }
+
+    function parseICSDate(line) {
+      const match = line.match(/(\d{8}T\d{6})/);
+      if (!match) return null;
+      const s = match[1];
+      return new Date(s.slice(0, 4), s.slice(4, 6) - 1, s.slice(6, 8), s.slice(9, 11), s.slice(11, 13));
+    }
+
+    function formatEventDate(date) {
+      if (!date) return '—';
+      const locale = currentLang === 'en' ? 'en-GB' : 'fr-FR';
+      return date.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+
+    function showLineCard(line) {
+      const modal = document.getElementById('preview-modal');
+      document.getElementById('preview-title').textContent = line.name;
+      document.getElementById('preview-body').innerHTML = renderLineCard(line);
+      modal.classList.remove('hidden');
+    }
+
+    async function showPreview(url, title) {
+      const modal = document.getElementById('preview-modal');
+      const body = document.getElementById('preview-body');
+      document.getElementById('preview-title').textContent = title;
+      body.innerHTML = `<p>${t('previewLoading')}</p>`;
+      modal.classList.remove('hidden');
+
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const text = await res.text();
+        const events = parseICS(text);
+
+        if (events.length === 0) {
+          body.innerHTML = `<p>${t('noDisruption')}</p>`;
+        } else {
+          body.innerHTML = events.map(e => `
+            <div class="event-item">
+              <strong>${escHtml(e.summary)}</strong>
+              <small>${formatEventDate(e.start)} — ${formatEventDate(e.end)}</small>
+              ${e.description ? `<p class="event-desc">${escHtml(e.description).replace(/\n/g, '<br>')}</p>` : ''}
+            </div>
+          `).join('');
+        }
+      } catch (err) {
+        body.innerHTML = `<p>${t('loadingError')}${escHtml(err.message)}</p>`;
+      }
+    }
+
+    function updateFilterVisibility() {
+      const isLines = currentTab === 'lines';
+      document.getElementById('mode-filter').classList.toggle('hidden', !isLines);
+      document.getElementById('network-filter').classList.toggle('hidden', !isLines);
+
+      document.getElementById('locate-btn').classList.toggle('hidden', isLines || !navigator.geolocation || userLat != null);
+      const sortEl = document.getElementById('sort');
+      const distOpt = sortEl.querySelector('option[value="distance"]');
+      if (distOpt) distOpt.classList.toggle('hidden', isLines);
+      if (isLines) {
+        if (sortEl.value === 'distance') sortEl.value = 'code';
+        document.getElementById('mode-filter').value = '';
+        document.getElementById('network-filter').value = '';
+      }
+    }
+
+    function hasActiveFilters() {
+      const search = document.getElementById('search').value;
+      const mode = document.getElementById('mode-filter').value;
+      const network = document.getElementById('network-filter').value;
+      return !!(search || mode || network);
+    }
+
+    function getFilteredItems() {
+      const search = stripAccents(document.getElementById('search').value.toLowerCase());
+      const mode = document.getElementById('mode-filter').value;
+      const network = document.getElementById('network-filter').value;
+      const sort = document.getElementById('sort').value;
+
+      let items = currentTab === 'lines' ? data.lines : data.stations;
+
+      items = items.filter(item => {
+        const searchStr = stripAccents(`${item.code || ''} ${item.name} ${item.commune || ''} ${item.network || ''} ${item.mode || ''}`.toLowerCase());
+        if (search && !searchStr.includes(search)) return false;
+        if (currentTab === 'lines') {
+          if (mode && item.mode !== mode) return false;
+          if (network && item.network !== network) return false;
+        }
+        return true;
+      });
+
+      items.sort((a, b) => {
+        let sortKey = sort;
+        // For stations, 'code' sorts by name instead
+        if (currentTab === 'stations' && sort === 'code') sortKey = 'name';
+
+        if (sortKey === 'code') {
+          const codeA = a.code || a.name;
+          const codeB = b.code || b.name;
+          return codeA.localeCompare(codeB, undefined, { numeric: true });
+        }
+        if (sortKey === 'name') return (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base', numeric: true });
+        if (sortKey === 'mode') return (a.mode || '').localeCompare(b.mode || '');
+        if (sortKey === 'network') return (a.network || '').localeCompare(b.network || '');
+        if (sortKey === 'distance') return (a._dist ?? Infinity) - (b._dist ?? Infinity);
+        return 0;
+      });
+
+      return items;
+    }
+
+    function updateTabCounts(linesFiltered, stationsFiltered) {
+      const linesTotal = data.lines.length;
+      const stationsTotal = data.stations.length;
+
+      document.getElementById('lines-count').textContent =
+        linesFiltered < linesTotal ? `${linesFiltered}/${linesTotal}` : linesTotal;
+      document.getElementById('stations-count').textContent =
+        stationsFiltered < stationsTotal ? `${stationsFiltered}/${stationsTotal}` : stationsTotal;
+    }
+
+    let renderPending = false;
+
+    function render() {
+      if (renderPending) return;
+
+      const grid = document.getElementById('grid');
+      const message = document.getElementById('message');
+
+      // Show loading, yield to browser, then do heavy work
+      message.textContent = t('previewLoading');
+      message.classList.remove('hidden');
+      grid.classList.add('hidden');
+      document.getElementById('station-table-container')?.remove();
+
+      renderPending = true;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          renderPending = false;
+          renderInner();
+        });
+      });
+    }
+
+    function renderInner() {
+      const items = getFilteredItems();
+      const grid = document.getElementById('grid');
+      const empty = document.getElementById('empty');
+      const message = document.getElementById('message');
+
+      // Update tab counts
+      const linesCount = getFilteredItemsForTab('lines').length;
+      const stationsCount = getFilteredItemsForTab('stations').length;
+      updateTabCounts(linesCount, stationsCount);
+
+      function hideStationTable() {
+        document.getElementById('station-table-container')?.remove();
+      }
+
+      // No results
+      if (items.length === 0) {
+        grid.innerHTML = '';
+        hideStationTable();
+        message.classList.add('hidden');
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+
+      // Too many results or no filters
+      const needsFilter = !hasActiveFilters() || items.length > MAX_RESULTS;
+      if (needsFilter && !forceShowAll) {
+        grid.innerHTML = '';
+        hideStationTable();
+        const itemType = currentTab === 'lines' ? t('lines') : t('stations');
+        const hint = !hasActiveFilters()
+          ? `${items.length} ${itemType} ${t('available')}`
+          : `${items.length} ${t('resultsHint')}`;
+        message.innerHTML = `${hint}<br><a id="show-all">${t('showAll')}</a>`;
+        message.classList.remove('hidden');
+        document.getElementById('show-all').addEventListener('click', (e) => {
+          e.preventDefault();
+          forceShowAll = true;
+          render();
+        });
+        return;
+      }
+      message.classList.add('hidden');
+
+      // Render items
+      if (currentTab === 'lines') {
+        grid.classList.remove('hidden');
+        hideStationTable();
+        grid.innerHTML = items.map(renderLineCard).join('');
+      } else {
+        grid.classList.add('hidden');
+        grid.innerHTML = '';
+        let tableContainer = document.getElementById('station-table-container');
+        if (!tableContainer) {
+          tableContainer = document.createElement('div');
+          tableContainer.id = 'station-table-container';
+          grid.parentNode.insertBefore(tableContainer, grid.nextSibling);
+        }
+        tableContainer.innerHTML = `<table class="station-table"><tbody>${items.map(renderStationRow).join('')}</tbody></table>`;
+      }
+    }
+
+    function getFilteredItemsForTab(tab) {
+      const search = stripAccents(document.getElementById('search').value.toLowerCase());
+      const mode = document.getElementById('mode-filter').value;
+      const network = document.getElementById('network-filter').value;
+
+      let items = tab === 'lines' ? data.lines : data.stations;
+
+      return items.filter(item => {
+        const searchStr = stripAccents(`${item.code || ''} ${item.name} ${item.commune || ''} ${item.network || ''} ${item.mode || ''}`.toLowerCase());
+        if (search && !searchStr.includes(search)) return false;
+        if (tab === 'lines') {
+          if (mode && item.mode !== mode) return false;
+          if (network && item.network !== network) return false;
+        }
+        return true;
+      });
+    }
+
+    function renderLineCard(line) {
+      const color = line.color || '666666';
+      const textColor = decodeTextColor(line.text_color);
+      const url = BASE_URL + 'lines/' + line.id + '.ics';
+      const subscribeUrl = getSubscribeUrl(url);
+      const isMetro = line.mode === 'Métro';
+      const badgeClass = isMetro ? 'badge metro' : 'badge';
+      const hasEvents = line.events > 0;
+      const eventCount = line.events === 1 ? t('oneDisruption') : `${line.events} ${t('nDisruptions')}`;
+
+      return `
+        <div class="card line">
+          <div class="card-row">
+            <div class="${badgeClass}" style="background:#${color};color:#${textColor}" title="${escAttr(line.name)}">${escHtml(line.code || '?')}</div>
+            <div class="name" title="${escAttr(line.name)}">${escHtml(line.name)}</div>
+            <div class="actions">
+              ${hasEvents ? `<button class="btn icon-btn preview-btn" data-url="${escAttr(url)}" title="${t('preview')}">${ICONS.preview}</button>` : ''}
+              <button class="btn icon-btn copy-btn" data-url="${escAttr(url)}" title="${t('copy')}">${ICONS.copy}</button>
+              <a class="btn icon-btn primary" href="${escAttr(subscribeUrl)}" title="${t('addCal')}">${ICONS.subscribe}</a>
+            </div>
+          </div>
+          ${line.termini?.length ? `<div class="termini">${line.termini.map(t => `<span>‣ ${escHtml(t)}</span>`).join('')}</div>` : ''}
+          <div class="card-row-bottom">
+            <div class="meta">${modeIcon(line.mode, 16)}${!MODE_ICONS[line.mode] && line.mode ? escHtml(line.mode) + ' · ' : ''}${escHtml(line.network || '')}</div>
+            ${hasEvents ? `<div class="event-count">${eventCount}</div>` : ''}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderStationRow(station) {
+      const url = BASE_URL + 'stations/' + station.id + '.ics';
+      const subscribeUrl = getSubscribeUrl(url);
+      const hasEvents = station.events > 0;
+
+      const linesByMode = new Map();
+      for (const idx of (station.lines || [])) {
+        const l = data.lines[idx];
+        if (!l) continue;
+        const mode = l.mode || '';
+        if (!linesByMode.has(mode)) linesByMode.set(mode, []);
+        linesByMode.get(mode).push({ ...l, _idx: idx });
+      }
+      const sortedModes = [...linesByMode.keys()].sort((a, b) => {
+        const ai = MODE_ORDER.indexOf(a), bi = MODE_ORDER.indexOf(b);
+        return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+      });
+      const linesBadges = sortedModes.map(mode => {
+        const lines = linesByMode.get(mode);
+        const badges = lines.map(l => {
+          const tooltip = [l.name, l.mode, l.network].filter(Boolean).join(' · ');
+          const metroClass = l.mode === 'Métro' ? ' metro' : '';
+          return `<span class="line-badge${metroClass}" data-line-idx="${l._idx}" style="background:#${l.color || '666'};color:#${decodeTextColor(l.text_color)}" title="${escAttr(tooltip)}">${escHtml(l.code)}</span>`;
+        }).join('');
+        return `<span class="mode-group">${modeIcon(mode, 14)}${badges}</span>`;
+      }).join('');
+
+      return `
+        <tr>
+          <td><span class="name">${escHtml(station.name)}</span>${station.commune ? `<br><span class="label">${escHtml(station.commune)}</span>` : ''}</td>
+          <td class="lines">${linesBadges}</td>
+          <td class="actions">
+            <button class="btn icon-btn preview-btn${hasEvents ? '' : ' invisible'}" data-url="${escAttr(url)}" title="${t('preview')}"${hasEvents ? '' : ' disabled'}>${ICONS.preview}</button>
+            <button class="btn icon-btn copy-btn" data-url="${escAttr(url)}" title="${t('copy')}">${ICONS.copy}</button>
+            <a class="btn icon-btn primary" href="${escAttr(subscribeUrl)}" title="${t('addCal')}">${ICONS.subscribe}</a>
+          </td>
+        </tr>
+      `;
+    }
+
+    function copyUrl(btn) {
+      const url = btn.dataset.url;
+      navigator.clipboard.writeText(url).then(() => {
+        btn.innerHTML = '✓';
+        btn.classList.add('copied');
+        showToast();
+        setTimeout(() => {
+          btn.innerHTML = ICONS.copy;
+          btn.classList.remove('copied');
+        }, 2000);
+      });
+    }
+
+    function showToast() {
+      const toast = document.getElementById('toast');
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 1500);
+    }
+
+    function stripAccents(str) {
+      return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+    }
+
+    function escHtml(str) {
+      return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+    function stationLabel(s) {
+      if (!s.commune) return s.name;
+      return s.name + ' (' + s.commune + ')';
+    }
+    function decodeTextColor(v) {
+      return v === 0 ? '000000' : v === 1 ? 'FFFFFF' : (v || 'FFFFFF');
+    }
+    function escAttr(str) {
+      return String(str).replace(/"/g, '&quot;');
+    }
+
+    init();
+  </script>
+</body>
+</html>
