@@ -703,6 +703,7 @@
         let generatedAt = new Date(data.generated_at);
         let reloadAttempted = false;
         let versionChecked = false;
+        let lastCheckAt = 0;
 
         async function tryReloadData() {
           try {
@@ -756,6 +757,7 @@
         async function checkVersion() {
           if (isStale(generatedAt) && !reloadAttempted) {
             reloadAttempted = true;
+            lastCheckAt = Date.now();
             if (!await tryReloadData()) versionChecked = true;
           }
           updateTimeDisplay();
@@ -763,11 +765,14 @@
 
         setInterval(checkVersion, 30000);
 
+        const RECHECK_AFTER_MS = 10 * 60 * 1000;
+
         document.addEventListener('visibilitychange', () => {
-          if (!document.hidden && isStale(generatedAt) && !versionChecked) {
-            reloadAttempted = false;
-            checkVersion();
-          }
+          if (document.hidden || !isStale(generatedAt)) return;
+          if (Date.now() - lastCheckAt < RECHECK_AFTER_MS) return;
+          versionChecked = false;
+          reloadAttempted = false;
+          checkVersion();
         });
       } catch (err) {
         loadingText.textContent = t('loadingError') + err.message;
