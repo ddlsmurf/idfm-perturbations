@@ -9,14 +9,16 @@ This folder contains pre-computed data that is expensive to generate.
 
 ## Usage
 
+IDs are stored without their IDFM prefix (`line:IDFM:` / `stop_area:IDFM:`).
+
 Query lines for a station:
 ```sql
-SELECT line_id FROM line_stations WHERE stop_area_id = 'stop_area:IDFM:XXXXX';
+SELECT line_id FROM line_stations WHERE stop_area_id = '69212';
 ```
 
 Query stations for a line:
 ```sql
-SELECT stop_area_id FROM line_stations WHERE line_id = 'line:IDFM:CXXXXX';
+SELECT stop_area_id FROM line_stations WHERE line_id = 'C01374';
 ```
 
 ## Why no indexes or uniqueness constraints?
@@ -24,7 +26,7 @@ SELECT stop_area_id FROM line_stations WHERE line_id = 'line:IDFM:CXXXXX';
 The `line_stations` table has no PRIMARY KEY, no UNIQUE constraint, and no indexes.
 This seems like bad database practice, but is intentional:
 
-1. **File size**: Indexes add ~60% to the file size (1.9 MB → 5 MB). Since this file is
+1. **File size**: Indexes add ~60% to the file size (~0.9 MB → ~1.5 MB). Since this file is
    committed to git, smaller is better.
 
 2. **Uniqueness not needed**: The table is rebuilt from scratch on each generation.
@@ -35,5 +37,5 @@ This seems like bad database practice, but is intentional:
    means no index would be used anyway.
 
 4. **Ad-hoc queries**: If you query this database directly (as shown above), it will be
-   slow without indexes. For ~200k rows, this is still sub-second on modern hardware.
+   slow without indexes. For ~43k rows, this is still sub-second on modern hardware.
    Create indexes locally if needed: `CREATE INDEX idx_stop ON line_stations(stop_area_id);`

@@ -244,6 +244,7 @@ async function main() {
     ["terminus_entries", String(terminusEntries)]
   );
 
+  await dbRun(db, "VACUUM");
   db.close();
 
   console.error("\n=== Summary ===");
