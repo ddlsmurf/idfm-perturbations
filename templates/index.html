@@ -932,9 +932,10 @@
       if (hasLineFilter) {
         candidates = candidates.filter(stationMatchesLineFilter);
       }
-      if (candidates.length < MIN_GEO_RESULTS) return 0;
+      if (candidates.length === 0) return DEFAULT_RADIUS_M;
       candidates.sort((a, b) => a._dist - b._dist);
-      const coverDist = candidates[MIN_GEO_RESULTS - 1]._dist;
+      const coverIdx = Math.min(MIN_GEO_RESULTS - 1, candidates.length - 1);
+      const coverDist = candidates[coverIdx]._dist;
       return SORTED_RADIUS_OPTIONS.find(r => r >= coverDist) ?? 0;
     }
 
