@@ -215,6 +215,17 @@
       text-align: center;
       line-height: 1.4rem;
     }
+    .station-table .line-badge-sub {
+      display: inline-block;
+      padding: 0.1rem 0.35rem;
+      border-radius: 3px;
+      font-size: 0.65rem;
+      font-weight: 500;
+      margin: 0.1rem 0.15rem 0.1rem 0;
+      cursor: pointer;
+      background: transparent;
+      border: 1px solid;
+    }
     .station-table .mode-group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.1rem; margin-right: 0.5rem; }
     .station-table .mode-group > img { width: 14px; height: 14px; flex-shrink: 0; margin-right: 0.15rem; }
     .station-table .actions { text-align: right; white-space: nowrap; display: flex; justify-content: flex-end; gap: 0.4rem; }
@@ -1082,7 +1093,7 @@
           return;
         }
 
-        const lineBadge = e.target.closest('.line-badge[data-line-idx]');
+        const lineBadge = e.target.closest('.line-badge[data-line-idx], .line-badge-sub[data-line-idx]');
         if (lineBadge) {
           e.preventDefault();
           const line = data.lines[parseInt(lineBadge.dataset.lineIdx, 10)];
@@ -1529,10 +1540,27 @@
       });
       const linesBadges = sortedModes.map(mode => {
         const lines = linesByMode.get(mode);
-        const badges = lines.map(l => {
-          const tooltip = [l.name, l.mode, l.network].filter(Boolean).join(' · ');
-          const metroClass = l.mode === 'Métro' ? ' metro' : '';
-          return `<span class="line-badge${metroClass}" data-line-idx="${l._idx}" style="background:#${l.color || '666'};color:#${decodeTextColor(l.text_color)}" title="${escAttr(tooltip)}">${escHtml(l.code)}</span>`;
+        const byCodeColor = new Map();
+        for (const l of lines) {
+          const key = (l.code || '') + '|' + (l.color || '');
+          if (!byCodeColor.has(key)) byCodeColor.set(key, []);
+          byCodeColor.get(key).push(l);
+        }
+        const badges = [...byCodeColor.values()].map(group => {
+          if (group.length === 1) {
+            const l = group[0];
+            const tooltip = [l.name, l.mode, l.network].filter(Boolean).join(' · ');
+            const metroClass = l.mode === 'Métro' ? ' metro' : '';
+            return `<span class="line-badge${metroClass}" data-line-idx="${l._idx}" style="background:#${l.color || '666'};color:#${decodeTextColor(l.text_color)}" title="${escAttr(tooltip)}">${escHtml(l.code)}</span>`;
+          }
+          const first = group[0];
+          const color = first.color || '666';
+          const main = `<span class="line-badge" style="background:#${color};color:#${decodeTextColor(first.text_color)}" title="${escAttr(first.code)}">${escHtml(first.code)}</span>`;
+          const subs = group.map(l => {
+            const label = stripCodePrefix(l.code, l.name) || l.name;
+            return `<span class="line-badge-sub" data-line-idx="${l._idx}" style="border-color:#${color};color:#${color}" title="${escAttr(l.name)}">${escHtml(label)}</span>`;
+          }).join('');
+          return main + subs;
         }).join('');
         return `<span class="mode-group">${modeIcon(mode, 14)}${badges}</span>`;
       }).join('');
