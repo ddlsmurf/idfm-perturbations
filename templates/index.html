@@ -1242,13 +1242,15 @@
       return !!(search || mode || network || filterLineIdx != null || (userLat != null && currentRadius_m > 0));
     }
 
-    function searchScore(item, queryWords) {
+    const SUBSTRING_FALLBACK_THRESHOLD = 5;
+    function searchScore(item, queryWords, substring) {
       const primaryWords = toWords(`${item.code || ''} ${item.name}`);
       const secondaryWords = toWords(`${item.commune || ''} ${item.network || ''} ${item.mode || ''}`);
       let score = 0;
       for (const q of queryWords) {
-        if (primaryWords.some(w => w.startsWith(q))) score += 2;
-        else if (secondaryWords.some(w => w.startsWith(q))) score += 1;
+        if (primaryWords.some(w => w.startsWith(q))) score += 4;
+        else if (secondaryWords.some(w => w.startsWith(q))) score += 2;
+        else if (substring && primaryWords.some(w => isSubsequence(q, w))) score += 1;
         else return 0;
       }
       return score;
@@ -1263,7 +1265,11 @@
       let items = currentTab === 'lines' ? data.lines : data.stations;
 
       if (words.length) {
-        items = items.map(item => ({ ...item, _score: searchScore(item, words) })).filter(item => item._score > 0);
+        let scored = items.map(item => ({ ...item, _score: searchScore(item, words, false) })).filter(item => item._score > 0);
+        if (scored.length < SUBSTRING_FALLBACK_THRESHOLD) {
+          scored = items.map(item => ({ ...item, _score: searchScore(item, words, true) })).filter(item => item._score > 0);
+        }
+        items = scored;
       }
 
       if (currentTab === 'stations' && filterLineIdx != null) {
@@ -1590,6 +1596,13 @@
 
     function toWords(str) {
       return str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/[^a-z0-9]+/).filter(Boolean);
+    }
+    function isSubsequence(query, word) {
+      let qi = 0;
+      for (let wi = 0; qi < query.length && wi < word.length; wi++) {
+        if (query[qi] === word[wi]) qi++;
+      }
+      return qi === query.length;
     }
 
     function escHtml(str) {
