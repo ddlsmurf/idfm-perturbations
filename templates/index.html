@@ -934,8 +934,8 @@
           <select id="platform-select">${platformOptions}</select>
         </span>
         <span>${ICONS.preview} ${t('legendPreview')}</span>
-        <span>${ICONS.stations} ${t('legendStations')}</span>
-        <span>${ICONS.location} ${t('legendMap')}</span>
+        ${currentTab === 'lines' ? `<span>${ICONS.stations} ${t('legendStations')}</span>` : ''}
+        ${currentTab === 'stations' ? `<span>${ICONS.location} ${t('legendMap')}</span>` : ''}
         <span class="alarm-tip">${t('alarmTip')}</span>
       `;
 
@@ -991,6 +991,7 @@
           filterLineIdx = null;
           forceShowAll = false;
           updateFilterVisibility();
+          renderLegend();
           render();
         });
       });
@@ -1066,6 +1067,7 @@
           forceShowAll = true;
           document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'stations'));
           updateFilterVisibility();
+          renderLegend();
           render();
           return;
         }
