@@ -246,10 +246,10 @@ async function main() {
   const filteredLines = lines.filter(l => !rerBusVariants.has(l.id));
   console.error(`  Merged ${rerBusVariants.size} RER bus variants (${lines.length} → ${filteredLines.length} lines)\n`);
 
-  // Generate line feeds
+  // Generate line feeds (all lines, including merged bus variants)
   console.error("Generating line feeds...");
   let lineCount = 0;
-  for (const line of filteredLines) {
+  for (const line of lines) {
     const strippedId = stripLinePrefix(line.id);
     const filepath = Path.join(LINES_DIR, strippedId + ".ics");
     const ical = generateLineFeed(line, allDisruptions, timezone, rerMergeIds.get(line.id));
