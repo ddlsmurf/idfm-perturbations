@@ -1262,7 +1262,10 @@
       const sortEl = document.getElementById('sort');
       const distOpt = sortEl.querySelector('option[value="distance"]');
       if (distOpt) distOpt.classList.toggle('hidden', isLines);
+      sortEl.querySelector('option[value="mode"]').classList.toggle('hidden', !isLines);
+      sortEl.querySelector('option[value="network"]').classList.toggle('hidden', !isLines);
       if (isLines && sortEl.value === 'distance') sortEl.value = 'code';
+      if (!isLines && (sortEl.value === 'mode' || sortEl.value === 'network')) sortEl.value = userLat != null ? 'distance' : 'name';
 
       const lineFilterEl = document.getElementById('line-filter');
       if (!isLines && filterLineIdx != null) {
