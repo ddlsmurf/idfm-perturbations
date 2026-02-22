@@ -1212,7 +1212,7 @@
             <div class="actions">
               ${hasEvents ? `<button class="btn icon-btn preview-btn" data-url="${escAttr(url)}" title="${t('preview')}">${ICONS.preview}</button>` : ''}
               <button class="btn icon-btn copy-btn" data-url="${escAttr(url)}" title="${t('copy')}">${ICONS.copy}</button>
-              <a class="btn icon-btn primary" href="${escAttr(subscribeUrl)}" title="${t('addCal')}">${ICONS.subscribe}</a>
+              <a class="btn icon-btn primary" href="${escAttr(subscribeUrl)}" target="_blank" rel="noopener" title="${t('addCal')}">${ICONS.subscribe}</a>
             </div>
           </div>
           ${line.termini?.length ? `<div class="termini">${line.termini.map(t => `<span>‣ ${escHtml(t)}</span>`).join('')}</div>` : ''}
@@ -1258,7 +1258,7 @@
           <td class="actions">
             <button class="btn icon-btn preview-btn${hasEvents ? '' : ' invisible'}" data-url="${escAttr(url)}" title="${t('preview')}"${hasEvents ? '' : ' disabled'}>${ICONS.preview}</button>
             <button class="btn icon-btn copy-btn" data-url="${escAttr(url)}" title="${t('copy')}">${ICONS.copy}</button>
-            <a class="btn icon-btn primary" href="${escAttr(subscribeUrl)}" title="${t('addCal')}">${ICONS.subscribe}</a>
+            <a class="btn icon-btn primary" href="${escAttr(subscribeUrl)}" target="_blank" rel="noopener" title="${t('addCal')}">${ICONS.subscribe}</a>
           </td>
         </tr>
       `;
