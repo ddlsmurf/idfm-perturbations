@@ -3,7 +3,7 @@ run-name: "Check mapping vote (issue #1)"
 
 on:
   schedule:
-    - cron: '30 */6 * * *'
+    - cron: '30 */8 * * *'
   workflow_dispatch:
 
 permissions:
@@ -22,7 +22,7 @@ jobs:
             const ISSUE = 1;
             const THRESHOLD = 10;
             const BOT_LOGIN = 'github-actions[bot]';
-            const COMMENT_BODY = `👍 **${THRESHOLD}** reactions here will trigger a mapping update (checked every 6h).\n${THRESHOLD} réactions ici déclencheront une mise à jour (vérifié toutes les 6h).`;
+            const COMMENT_BODY = `👍 **${THRESHOLD}** reactions here will trigger a mapping update (checked every 8h).\n${THRESHOLD} réactions ici déclencheront une mise à jour (vérifié toutes les 8h).`;
 
             function makeCommentBody() {
               return COMMENT_BODY;
