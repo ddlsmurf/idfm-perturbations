@@ -24,13 +24,12 @@
       min-height: 100vh;
     }
     .container { max-width: 1200px; margin: 0 auto; padding: 1rem; }
-    header { padding: 1.5rem 0; border-bottom: 1px solid var(--border); margin-bottom: 1rem; position: relative; }
+    header { padding: 1.5rem 0; border-bottom: 1px solid var(--border); margin-bottom: 1rem; }
     h1 { font-size: 1.5rem; font-weight: 600; }
     .lang-toggle {
-      position: absolute;
-      top: 1.5rem;
-      right: 0;
       display: flex;
+      flex-shrink: 0;
+      margin-left: auto;
       background: var(--bg-card);
       border-radius: 1rem;
       padding: 0.15rem;
@@ -345,11 +344,13 @@
 <body>
   <div class="container">
     <header>
-      <div class="lang-toggle">
-        <button class="lang-btn active" data-lang="fr" title="Français">🇫🇷</button>
-        <button class="lang-btn" data-lang="en" title="English">🇬🇧</button>
+      <div style="display:flex;align-items:baseline;gap:1rem;">
+        <h1 data-i18n="heading">Perturbations Île-de-France Mobilités</h1>
+        <div class="lang-toggle">
+          <button class="lang-btn active" data-lang="fr" title="Français">🇫🇷</button>
+          <button class="lang-btn" data-lang="en" title="English">🇬🇧</button>
+        </div>
       </div>
-      <h1 data-i18n="heading">Perturbations Île-de-France Mobilités</h1>
       <p style="font-size:1.1rem;margin-top:0.5rem;" data-i18n="tagline">Ajoutez les perturbations d'une ligne ou station à votre application calendrier.</p>
       <p style="color:var(--text-muted);margin-top:0.5rem;font-size:0.9rem;" data-i18n-html="intro">Abonnez-vous à une ligne pour recevoir tous les événements la concernant, ou à une station pour les événements de toutes les lignes qui la desservent.</p>
     </header>
