@@ -150,7 +150,7 @@
     .geo-error { color: #c00; font-size: 0.8rem; }
 
     /* Actions */
-    .actions { display: flex; gap: 0.4rem; }
+    .actions { display: flex; gap: 0.4rem; margin-left: auto; }
     .btn {
       background: none;
       border: 1px solid var(--border);
@@ -1327,6 +1327,26 @@
       });
     }
 
+    function lineLabelHtml(line) {
+      const label = stripCodePrefix(line.code, line.name);
+      if (!label) return '';
+      return `<div class="name" title="${escAttr(line.name)}">${escHtml(label)}</div>`;
+    }
+
+    function stripCodePrefix(code, name) {
+      if (code === 'Soir' && /^Soir[ée]*\s/i.test(name))
+        return name.replace(/^Soir[ée]*\s*-?\s*/i, '');
+      if (!code) return name;
+      const codeWords = code.split(/\s+/);
+      const nameWords = name.split(/\s+/);
+      let matched = 0;
+      while (matched < codeWords.length && matched < nameWords.length
+        && nameWords[matched].toLowerCase().startsWith(codeWords[matched].toLowerCase()))
+        matched++;
+      if (matched === 0) return name;
+      return nameWords.slice(matched).join(' ');
+    }
+
     function renderLineCard(line) {
       const color = line.color || '666666';
       const textColor = decodeTextColor(line.text_color);
@@ -1341,7 +1361,7 @@
         <div class="card line">
           <div class="card-row">
             <div class="${badgeClass}" style="background:#${color};color:#${textColor}" title="${escAttr(line.name)}">${escHtml(line.code || '?')}</div>
-            <div class="name" title="${escAttr(line.name)}">${escHtml(line.name)}</div>
+            ${lineLabelHtml(line)}
             <div class="actions">
               ${hasEvents ? `<button class="btn icon-btn preview-btn" data-url="${escAttr(url)}" title="${t('preview')}">${ICONS.preview}</button>` : ''}
               <a class="btn icon-btn primary subscribe-btn" href="${escAttr(subscribeUrl)}" data-url="${escAttr(url)}" target="_blank" rel="noopener" title="${t('addCal')}">${ICONS.subscribe}</a>
