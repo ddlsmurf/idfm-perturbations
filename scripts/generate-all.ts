@@ -300,9 +300,11 @@ async function main() {
   const networkIndex = new Map(networkSet.map((n, i) => [n, i]));
   const modeIndex = new Map(modeSet.map((m, i) => [m, i]));
 
+  const generated_at = new Date().toISOString();
+
   // Generate index manifest
   const manifest = {
-    generated_at: new Date().toISOString(),
+    generated_at,
     timezone,
     oldest_disruption: oldestDisruption,
     latest_disruption: latestDisruption,
@@ -355,6 +357,10 @@ async function main() {
   const indexPath = Path.join(OUTPUT_DIR, "index.json");
   FS.writeFileSync(indexPath, JSON.stringify(manifest), "utf-8");
   console.error(`\nWrote manifest to ${indexPath}`);
+
+  const versionPath = Path.join(OUTPUT_DIR, "version.json");
+  FS.writeFileSync(versionPath, JSON.stringify({ generated_at }), "utf-8");
+  console.error(`Wrote version to ${versionPath}`);
 
   // Copy HTML template
   const templatePath = Util.pathInProjectRoot("templates/index.html");

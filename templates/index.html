@@ -702,10 +702,11 @@
 
         let generatedAt = new Date(data.generated_at);
         let reloadAttempted = false;
+        let versionChecked = false;
 
         async function tryReloadData() {
           try {
-            const res = await fetch('index.json', { cache: 'no-cache' });
+            const res = await fetch('version.json', { cache: 'no-cache' });
             const fresh = await res.json();
             const freshDate = new Date(fresh.generated_at);
             if (freshDate > generatedAt) {
@@ -738,7 +739,7 @@
           const reloadEl = document.getElementById('reload-btn');
           if (reloadEl) reloadEl.classList.toggle('hidden', age_s < SHOW_RELOAD_AFTER_S);
           const statusEl = document.getElementById('stale-status');
-          if (statusEl) statusEl.classList.toggle('hidden', !stale);
+          if (statusEl) statusEl.classList.toggle('hidden', !(stale && versionChecked));
         }
 
         document.getElementById('reload-btn').addEventListener('click', async (e) => {
@@ -746,18 +747,28 @@
           const btn = e.currentTarget;
           btn.classList.add('spinning');
           if (!await tryReloadData()) {
+            versionChecked = true;
             btn.classList.remove('spinning');
             updateTimeDisplay();
           }
         });
 
-        setInterval(async () => {
+        async function checkVersion() {
           if (isStale(generatedAt) && !reloadAttempted) {
             reloadAttempted = true;
-            await tryReloadData();
+            if (!await tryReloadData()) versionChecked = true;
           }
           updateTimeDisplay();
-        }, 30000);
+        }
+
+        setInterval(checkVersion, 30000);
+
+        document.addEventListener('visibilitychange', () => {
+          if (!document.hidden && isStale(generatedAt) && !versionChecked) {
+            reloadAttempted = false;
+            checkVersion();
+          }
+        });
       } catch (err) {
         loadingText.textContent = t('loadingError') + err.message;
       }
