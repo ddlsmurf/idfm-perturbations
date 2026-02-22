@@ -108,6 +108,17 @@
     select { min-width: 140px; }
     #line-filter { display: inline-flex; align-items: center; gap: 0.4rem; border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 10%, var(--bg-card)); padding: 0.5rem 0.75rem; border-radius: 4px; font-size: 0.9rem; }
     #line-filter .badge, #line-filter .badge.metro { height: 1.4em; min-width: 1.4em; width: auto; font-size: 0.8em; line-height: 1.4em; }
+    .custom-select { position: relative; min-width: 200px; background: var(--bg-card); border: 1px solid var(--border); color: var(--text); border-radius: 4px; font-size: 0.9rem; cursor: pointer; user-select: none; }
+    .custom-select:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+    .custom-select .cs-trigger { display: flex; align-items: center; gap: 0.4rem; padding: 0.5rem 0.75rem; }
+    .custom-select .cs-trigger img { flex-shrink: 0; }
+    .custom-select .cs-arrow { margin-left: auto; font-size: 0.7rem; opacity: 0.6; }
+    .custom-select .cs-dropdown { display: none; position: absolute; top: calc(100% + 2px); left: 0; right: 0; z-index: 100; max-height: 300px; overflow-y: auto; background: var(--bg-card); border: 1px solid var(--border); border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+    .custom-select.open .cs-dropdown { display: block; }
+    .custom-select .cs-option { display: flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.75rem; cursor: pointer; }
+    .custom-select .cs-option:hover { background: color-mix(in srgb, var(--accent) 12%, var(--bg-card)); }
+    .custom-select .cs-option.selected { background: color-mix(in srgb, var(--accent) 20%, var(--bg-card)); font-weight: 600; }
+    .custom-select .cs-option img { width: 18px; height: 18px; flex-shrink: 0; }
 
     /* Grid */
     .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.75rem; }
@@ -338,8 +349,8 @@
       .tab .count { margin-left: 0; }
       .legend { justify-content: flex-start; }
       .controls { flex-direction: column; }
-      input, select { font-size: 16px; }
-      input[type="search"], select { width: 100%; }
+      input, select, .custom-select { font-size: 16px; }
+      input[type="search"], select, .custom-select { width: 100%; }
       .locate-btn { padding: 0.5rem 0.75rem; font-size: 16px; }
       .grid { grid-template-columns: 1fr; }
       .card { padding: 0.5rem; max-width: 100%; overflow: hidden; }
@@ -391,9 +402,10 @@
 
       <div class="controls">
         <input type="search" id="search" data-i18n-placeholder="search" placeholder="Rechercher...">
-        <select id="mode-filter">
-          <option value="" data-i18n="allModes">Tous les modes</option>
-        </select>
+        <div class="custom-select" id="mode-filter" tabindex="0">
+          <div class="cs-trigger"><span>Tous les modes</span><span class="cs-arrow">▾</span></div>
+          <div class="cs-dropdown"></div>
+        </div>
         <select id="network-filter">
           <option value="" data-i18n="allNetworks">Tous les réseaux</option>
         </select>
@@ -503,6 +515,59 @@
       const uri = MODE_ICONS[mode];
       if (!uri) return '';
       return `<img src="${uri}" width="${size}" height="${size}" alt="${escAttr(mode)}" title="${escAttr(mode)}">`;
+    }
+
+    function createCustomSelect(container, options) {
+      const trigger = container.querySelector('.cs-trigger');
+      const dropdown = container.querySelector('.cs-dropdown');
+      let _value = '';
+      container._csOptions = options;
+
+      function rebuild() {
+        dropdown.innerHTML = options.map(o =>
+          `<div class="cs-option${o.value === _value ? ' selected' : ''}" data-value="${escAttr(o.value)}">${o.iconHtml}<span>${escHtml(o.label)}</span></div>`
+        ).join('');
+      }
+
+      function updateTrigger() {
+        const opt = options.find(o => o.value === _value) || options[0];
+        trigger.innerHTML = `${opt.iconHtml}<span>${escHtml(opt.label)}</span><span class="cs-arrow">▾</span>`;
+      }
+
+      function select(value) {
+        _value = value;
+        dropdown.querySelectorAll('.cs-option').forEach(el =>
+          el.classList.toggle('selected', el.dataset.value === value)
+        );
+        updateTrigger();
+        container.classList.remove('open');
+        container.dispatchEvent(new Event('change'));
+      }
+
+      Object.defineProperty(container, 'value', {
+        get() { return _value; },
+        set(v) { _value = v; updateTrigger(); dropdown.querySelectorAll('.cs-option').forEach(el => el.classList.toggle('selected', el.dataset.value === v)); },
+      });
+
+      container._csUpdateDefaultLabel = function(label) {
+        const def = options.find(o => o.value === '');
+        if (def) { def.label = label; rebuild(); updateTrigger(); }
+      };
+
+      trigger.addEventListener('click', () => container.classList.toggle('open'));
+      dropdown.addEventListener('click', (e) => {
+        const opt = e.target.closest('.cs-option');
+        if (opt) select(opt.dataset.value);
+      });
+      document.addEventListener('click', (e) => {
+        if (!container.contains(e.target)) container.classList.remove('open');
+      });
+      container.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') container.classList.remove('open');
+      });
+
+      rebuild();
+      updateTrigger();
     }
 
     const TRANSLATIONS = {
@@ -660,6 +725,9 @@
       document.querySelectorAll('[data-i18n-title]').forEach(el => {
         el.title = t(el.dataset.i18nTitle);
       });
+
+      const modeEl = document.getElementById('mode-filter');
+      if (modeEl._csUpdateDefaultLabel) modeEl._csUpdateDefaultLabel(t('allModes'));
 
       if (data) {
         renderStats();
@@ -1013,12 +1081,12 @@
       const networks = [...new Set(data.lines.map(l => l.network).filter(Boolean))].sort();
 
       const modeSelect = document.getElementById('mode-filter');
-      modes.forEach(m => {
-        const opt = document.createElement('option');
-        opt.value = m;
-        opt.textContent = m;
-        modeSelect.appendChild(opt);
-      });
+      const modeOptions = [
+        { value: '', label: t('allModes'), iconHtml: '' },
+        ...MODE_ORDER.filter(m => modes.includes(m)).map(m => ({ value: m, label: m, iconHtml: modeIcon(m, 18) })),
+        ...modes.filter(m => !MODE_ORDER.includes(m)).map(m => ({ value: m, label: m, iconHtml: modeIcon(m, 18) })),
+      ];
+      createCustomSelect(modeSelect, modeOptions);
 
       const pinnedNetworks = ['RATP', 'RER', 'TER', 'Transilien'];
 
@@ -1557,10 +1625,14 @@
       }
 
 
-      for (const opt of modeEl.options) {
-        if (!opt.value) continue;
-        const count = modeCounts.get(opt.value) || 0;
-        opt.textContent = `${opt.value} (${count})`;
+      for (const opt of modeEl.querySelectorAll('.cs-option')) {
+        if (!opt.dataset.value) continue;
+        const count = modeCounts.get(opt.dataset.value) || 0;
+        opt.querySelector('span').textContent = `${opt.dataset.value} (${count})`;
+      }
+      if (modeEl.value) {
+        const sel = modeEl.querySelector(`.cs-option[data-value="${CSS.escape(modeEl.value)}"] span`);
+        if (sel) modeEl.querySelector('.cs-trigger span:not(.cs-arrow)').textContent = sel.textContent;
       }
 
       for (const opt of networkEl.options) {
