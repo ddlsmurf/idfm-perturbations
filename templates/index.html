@@ -1506,6 +1506,10 @@
       `;
     }
 
+    function formatDistance(meters) {
+      return meters < 1000 ? `${Math.round(meters)} m` : `${(meters / 1000).toFixed(1)} km`;
+    }
+
     function renderStationRow(station) {
       const url = BASE_URL + 'stations/' + station.id + '.ics';
       const subscribeUrl = getSubscribeUrl(url);
@@ -1535,7 +1539,7 @@
 
       return `
         <tr>
-          <td><span class="name">${escHtml(station.name)}</span>${station.commune ? `<br><span class="label">${escHtml(station.commune)}</span>` : ''}</td>
+          <td><span class="name">${escHtml(station.name)}</span>${station.commune || station._dist != null ? `<br><span class="label">${[station.commune, station._dist != null ? formatDistance(station._dist) : null].filter(Boolean).join(' · ')}</span>` : ''}</td>
           <td class="lines">${linesBadges}</td>
           <td class="actions">
             <button class="btn icon-btn preview-btn${hasEvents ? '' : ' invisible'}" data-url="${escAttr(url)}" title="${t('preview')}"${hasEvents ? '' : ' disabled'}>${ICONS.preview}</button>
