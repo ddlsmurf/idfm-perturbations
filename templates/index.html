@@ -735,6 +735,8 @@
         const savedSort = localStorage.getItem('sort');
         if (savedSort && savedSort !== 'distance') document.getElementById('sort').value = savedSort;
 
+        restoreUrlState();
+
         document.getElementById('loading').classList.add('hidden');
         document.getElementById('app').classList.remove('hidden');
 
@@ -847,7 +849,26 @@
       return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
-    function requestGeolocation() {
+    const MIN_GEO_RESULTS = 3;
+    const SORTED_RADIUS_OPTIONS = RADIUS_OPTIONS_M.filter(r => r > 0).sort((a, b) => a - b);
+    function radiusForCurrentFilters() {
+      const words = toWords(document.getElementById('search').value);
+      const hasLineFilter = currentTab === 'stations' && filterLineIdx != null;
+      if (!words.length && !hasLineFilter) return DEFAULT_RADIUS_M;
+      let candidates = data.stations.filter(s => typeof s._dist === 'number' && isFinite(s._dist));
+      if (words.length) {
+        candidates = candidates.filter(s => searchScore(s, words, true) > 0);
+      }
+      if (hasLineFilter) {
+        candidates = candidates.filter(stationMatchesLineFilter);
+      }
+      if (candidates.length < MIN_GEO_RESULTS) return 0;
+      candidates.sort((a, b) => a._dist - b._dist);
+      const coverDist = candidates[MIN_GEO_RESULTS - 1]._dist;
+      return SORTED_RADIUS_OPTIONS.find(r => r >= coverDist) ?? 0;
+    }
+
+    function requestGeolocation(initialRadius_m) {
       const btn = document.getElementById('locate-btn');
       if (!navigator.geolocation) {
         console.error('[geo] navigator.geolocation not available');
@@ -880,22 +901,32 @@
         }
         sortEl.value = 'distance';
         localStorage.setItem('sort', 'distance');
-        const sel = document.createElement('select');
-        sel.id = 'radius-select';
-        for (const r of RADIUS_OPTIONS_M) {
-          const opt = document.createElement('option');
-          opt.value = r;
-          const label = r === 0 ? t('radiusAll') : r < 1000 ? `${r} m` : `${r / 1000} km`;
-          opt.textContent = r === 0 ? label : `≤ ${label}`;
-          if (r === DEFAULT_RADIUS_M) opt.selected = true;
-          sel.appendChild(opt);
+        const autoRadius = radiusForCurrentFilters();
+        const merged = initialRadius_m != null ? Math.max(initialRadius_m, autoRadius) : autoRadius;
+        const effectiveRadius = SORTED_RADIUS_OPTIONS.find(r => r >= merged) ?? 0;
+        currentRadius_m = effectiveRadius;
+        const existingSel = document.getElementById('radius-select');
+        if (existingSel) {
+          existingSel.value = effectiveRadius;
+        } else {
+          const sel = document.createElement('select');
+          sel.id = 'radius-select';
+          for (const r of RADIUS_OPTIONS_M) {
+            const opt = document.createElement('option');
+            opt.value = r;
+            const label = r === 0 ? t('radiusAll') : r < 1000 ? `${r} m` : `${r / 1000} km`;
+            opt.textContent = r === 0 ? label : `≤ ${label}`;
+            if (r === effectiveRadius) opt.selected = true;
+            sel.appendChild(opt);
+          }
+          sel.addEventListener('change', () => {
+            currentRadius_m = parseInt(sel.value, 10);
+            render();
+          });
+          btn.replaceWith(sel);
         }
-        sel.addEventListener('change', () => {
-          currentRadius_m = parseInt(sel.value, 10);
-          render();
-        });
-        btn.replaceWith(sel);
-        currentRadius_m = DEFAULT_RADIUS_M;
+        forceShowAll = false;
+        updateFilterVisibility();
         render();
       }, (err) => {
         const CODES = { 1: 'PERMISSION_DENIED', 2: 'POSITION_UNAVAILABLE', 3: 'TIMEOUT' };
@@ -1015,7 +1046,6 @@
           document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
           tab.classList.add('active');
           currentTab = tab.dataset.tab;
-          filterLineIdx = null;
           forceShowAll = false;
           updateFilterVisibility();
           renderLegend();
@@ -1028,7 +1058,6 @@
       document.getElementById('search').addEventListener('input', () => {
         clearTimeout(searchTimeout);
         searchTimeout = setTimeout(() => {
-          filterLineIdx = null;
           forceShowAll = false;
           render();
         }, 200);
@@ -1055,7 +1084,7 @@
         });
       });
 
-      document.getElementById('locate-btn').addEventListener('click', requestGeolocation);
+      document.getElementById('locate-btn').addEventListener('click', () => requestGeolocation());
 
 
 
@@ -1233,11 +1262,7 @@
       const sortEl = document.getElementById('sort');
       const distOpt = sortEl.querySelector('option[value="distance"]');
       if (distOpt) distOpt.classList.toggle('hidden', isLines);
-      if (isLines) {
-        if (sortEl.value === 'distance') sortEl.value = 'code';
-        document.getElementById('mode-filter').value = '';
-        document.getElementById('network-filter').value = '';
-      }
+      if (isLines && sortEl.value === 'distance') sortEl.value = 'code';
 
       const lineFilterEl = document.getElementById('line-filter');
       if (!isLines && filterLineIdx != null) {
@@ -1395,6 +1420,7 @@
         hideStationTable();
         message.classList.add('hidden');
         empty.classList.remove('hidden');
+        syncUrlState();
         return;
       }
       empty.classList.add('hidden');
@@ -1415,6 +1441,7 @@
           forceShowAll = true;
           render();
         });
+        syncUrlState();
         return;
       }
       message.classList.add('hidden');
@@ -1434,6 +1461,55 @@
           grid.parentNode.insertBefore(tableContainer, grid.nextSibling);
         }
         tableContainer.innerHTML = `<table class="station-table"><tbody>${items.map(renderStationRow).join('')}</tbody></table>`;
+      }
+      syncUrlState();
+    }
+
+    function syncUrlState() {
+      const params = new URLSearchParams();
+      if (currentTab !== 'lines') params.set('tab', currentTab);
+      const q = document.getElementById('search').value;
+      if (q) params.set('q', q);
+      const mode = document.getElementById('mode-filter').value;
+      if (mode) params.set('mode', mode);
+      const net = document.getElementById('network-filter').value;
+      if (net) params.set('net', net);
+      if (filterLineIdx != null) params.set('line', filterLineIdx);
+      const sort = document.getElementById('sort').value;
+      if (sort && sort !== 'code') params.set('sort', sort);
+      const radiusSel = document.getElementById('radius-select');
+      if (radiusSel && parseInt(radiusSel.value, 10) !== DEFAULT_RADIUS_M) {
+        params.set('radius', radiusSel.value);
+      }
+      const hash = params.toString();
+      history.replaceState(null, '', hash ? '#' + hash : location.pathname + location.search);
+    }
+
+    function restoreUrlState() {
+      if (!location.hash || location.hash.length < 2) return;
+      const params = new URLSearchParams(location.hash.slice(1));
+      const tab = params.get('tab');
+      if (tab === 'stations') {
+        currentTab = 'stations';
+        document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'stations'));
+      }
+      const q = params.get('q');
+      if (q) document.getElementById('search').value = q;
+      const mode = params.get('mode');
+      if (mode) document.getElementById('mode-filter').value = mode;
+      const net = params.get('net');
+      if (net) document.getElementById('network-filter').value = net;
+      const line = params.get('line');
+      if (line != null && line !== '') {
+        const idx = parseInt(line, 10);
+        if (idx >= 0 && idx < data.lines.length) filterLineIdx = idx;
+      }
+      const sort = params.get('sort');
+      const needsGeo = sort === 'distance';
+      if (sort && !needsGeo) document.getElementById('sort').value = sort;
+      if (needsGeo) {
+        const radius = params.get('radius');
+        requestGeolocation(radius ? parseInt(radius, 10) : undefined);
       }
     }
 
