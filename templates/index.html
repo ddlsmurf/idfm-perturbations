@@ -413,6 +413,7 @@
         <button id="locate-btn" class="locate-btn hidden" title="Sort by distance" data-i18n-title="locateTitle" data-i18n="locateBtn">📍 Près de moi</button>
         <span id="geo-error" class="geo-error hidden"></span>
         <select id="sort">
+          <option value="relevance" class="hidden" data-i18n="sortRelevance">Tri: Pertinence</option>
           <option value="code" data-i18n="sortCode">Tri: Code</option>
           <option value="name" data-i18n="sortName">Tri: Nom</option>
           <option value="mode" data-i18n="sortMode">Tri: Mode</option>
@@ -585,6 +586,7 @@
         search: "Rechercher...",
         allModes: "Tous les modes",
         allNetworks: "Tous les réseaux",
+        sortRelevance: "Tri: Pertinence",
         sortCode: "Tri: Code",
         sortName: "Tri: Nom",
         sortMode: "Tri: Mode",
@@ -644,6 +646,7 @@
         search: "Search...",
         allModes: "All modes",
         allNetworks: "All networks",
+        sortRelevance: "Sort: Relevance",
         sortCode: "Sort: Code",
         sortName: "Sort: Name",
         sortMode: "Sort: Mode",
@@ -927,7 +930,7 @@
       if (!words.length && !hasLineFilter) return DEFAULT_RADIUS_M;
       let candidates = data.stations.filter(s => typeof s._dist === 'number' && isFinite(s._dist));
       if (words.length) {
-        candidates = candidates.filter(s => searchScore(s, words, true) > 0);
+        candidates = candidates.filter(s => searchScore(s, words, SEARCH_SUBSTRING) > 0);
       }
       if (hasLineFilter) {
         candidates = candidates.filter(stationMatchesLineFilter);
@@ -1335,10 +1338,15 @@
       const radiusSel = document.getElementById('radius-select');
       if (radiusSel) radiusSel.classList.toggle('hidden', isLines);
       const sortEl = document.getElementById('sort');
+      const hasSearch = document.getElementById('search').value.trim().length > 0;
+      const relOpt = sortEl.querySelector('option[value="relevance"]');
+      relOpt.classList.toggle('hidden', !hasSearch);
       const distOpt = sortEl.querySelector('option[value="distance"]');
       if (distOpt) distOpt.classList.toggle('hidden', isLines);
       sortEl.querySelector('option[value="mode"]').classList.toggle('hidden', !isLines);
       sortEl.querySelector('option[value="network"]').classList.toggle('hidden', !isLines);
+      if (hasSearch && userLat == null) sortEl.value = 'relevance';
+      else if (!hasSearch && sortEl.value === 'relevance') sortEl.value = userLat != null ? 'distance' : (isLines ? 'code' : 'name');
       if (isLines && sortEl.value === 'distance') sortEl.value = 'code';
       if (!isLines && (sortEl.value === 'mode' || sortEl.value === 'network')) sortEl.value = userLat != null ? 'distance' : 'name';
 
@@ -1379,15 +1387,21 @@
       return !!(search || mode || network || filterLineIdx != null || (userLat != null && currentRadius_m > 0));
     }
 
-    const SUBSTRING_FALLBACK_THRESHOLD = 5;
-    function searchScore(item, queryWords, substring) {
+    const SUBSTRING_FALLBACK_THRESHOLD = 10;
+    const SEARCH_PREFIX = 0, SEARCH_SUBSEQUENCE = 1, SEARCH_SUBSTRING = 2;
+    function searchScore(item, queryWords, level) {
       const primaryWords = toWords(`${item.code || ''} ${item.name}`);
       const secondaryWords = toWords(`${item.commune || ''} ${item.network || ''} ${item.mode || ''}`);
       let score = 0;
       for (const q of queryWords) {
         if (primaryWords.some(w => w.startsWith(q))) score += 4;
         else if (secondaryWords.some(w => w.startsWith(q))) score += 2;
-        else if (substring && primaryWords.some(w => isSubsequence(q, w))) score += 1;
+        else if (level >= SEARCH_SUBSEQUENCE && primaryWords.some(w => subsequenceScore(q, w) > 0)) score += 1;
+        else if (level >= SEARCH_SUBSTRING) {
+          const ss = subsequenceScore(q, toNormalized(`${item.code || ''} ${item.name} ${item.commune || ''}`));
+          if (ss > 0) score += ss * 0.5;
+          else return 0;
+        }
         else return 0;
       }
       return score;
@@ -1402,9 +1416,12 @@
       let items = currentTab === 'lines' ? data.lines : data.stations;
 
       if (words.length) {
-        let scored = items.map(item => ({ ...item, _score: searchScore(item, words, false) })).filter(item => item._score > 0);
+        let scored = items.map(item => ({ ...item, _score: searchScore(item, words, SEARCH_PREFIX) })).filter(item => item._score > 0);
         if (scored.length < SUBSTRING_FALLBACK_THRESHOLD) {
-          scored = items.map(item => ({ ...item, _score: searchScore(item, words, true) })).filter(item => item._score > 0);
+          scored = items.map(item => ({ ...item, _score: searchScore(item, words, SEARCH_SUBSEQUENCE) })).filter(item => item._score > 0);
+        }
+        if (scored.length < SUBSTRING_FALLBACK_THRESHOLD) {
+          scored = items.map(item => ({ ...item, _score: searchScore(item, words, SEARCH_SUBSTRING) })).filter(item => item._score > 0);
         }
         items = scored;
       }
@@ -1426,13 +1443,13 @@
       }
 
       items.sort((a, b) => {
-        if (words.length) {
-          const scoreDiff = b._score - a._score;
+        if (words.length && (sort === 'relevance' || a._score !== b._score)) {
+          const scoreDiff = (b._score ?? 0) - (a._score ?? 0);
           if (scoreDiff !== 0) return scoreDiff;
         }
 
-        let sortKey = sort;
-        if (currentTab === 'stations' && sort === 'code') sortKey = 'name';
+        let sortKey = sort === 'relevance' ? (currentTab === 'lines' ? 'code' : 'name') : sort;
+        if (currentTab === 'stations' && sortKey === 'code') sortKey = 'name';
 
         if (sortKey === 'code') {
           const codeA = a.code || a.name;
@@ -1609,7 +1626,7 @@
       // Pre-filter by search
       let searchFiltered = data.lines;
       if (words.length) {
-        searchFiltered = searchFiltered.filter(l => searchScore(l, words));
+        searchFiltered = searchFiltered.filter(l => searchScore(l, words, SEARCH_SUBSTRING));
       }
 
       // Count per mode (applying current network filter)
@@ -1671,7 +1688,7 @@
       }
 
       return items.filter(item => {
-        if (words.length && !searchScore(item, words)) return false;
+        if (words.length && !searchScore(item, words, SEARCH_SUBSTRING)) return false;
         if (tab === 'lines') {
           if (mode && item.mode !== mode) return false;
           if (network && item.network !== network) return false;
@@ -1813,15 +1830,25 @@
       return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
     }
 
-    function toWords(str) {
-      return str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').split(/[^a-z0-9]+/).filter(Boolean);
+    function toNormalized(str) {
+      return str.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     }
-    function isSubsequence(query, word) {
-      let qi = 0;
-      for (let wi = 0; qi < query.length && wi < word.length; wi++) {
-        if (query[qi] === word[wi]) qi++;
+    function toWords(str) {
+      return toNormalized(str).split(/[^a-z0-9]+/).filter(Boolean);
+    }
+    /** Returns 0 if not a subsequence, otherwise a score in (0, 1] rewarding consecutive matches. */
+    function subsequenceScore(query, text) {
+      let qi = 0, runs = 0, inRun = false;
+      for (let wi = 0; qi < query.length && wi < text.length; wi++) {
+        if (query[qi] === text[wi]) {
+          if (!inRun) { runs++; inRun = true; }
+          qi++;
+        } else {
+          inRun = false;
+        }
       }
-      return qi === query.length;
+      if (qi < query.length) return 0;
+      return query.length / (query.length + runs - 1);
     }
 
     function escHtml(str) {
