@@ -62,9 +62,11 @@ The `dist/calendars/` folder can be deployed to any static hosting.
 ├── .github/workflows/
 │   ├── deploy.yml             # Generate + deploy to Cloudflare Pages
 │   ├── mapping.yml            # Generate line↔station mapping DB
+│   ├── mapping-vote.yml       # Community vote to trigger mapping update
 │   └── cleanup.yml            # Clean up old Pages deployments
 ├── cache/
-│   └── line_station_mapping.db  # Pre-built line↔station mapping
+│   ├── line_station_mapping.db  # Pre-built line↔station mapping
+│   └── [README.md](cache/README.md)  # Schema and query documentation
 ├── lib/
 │   ├── client/
 │   │   ├── cache.ts           # SQLite cache for API responses
@@ -75,7 +77,8 @@ The `dist/calendars/` folder can be deployed to any static hosting.
 │   │   ├── line.ts            # Line feed generator
 │   │   └── station.ts         # Station feed generator
 │   ├── ical.ts                # iCal RFC 5545 formatting
-│   └── index.ts               # API client
+│   ├── index.ts               # API client
+│   └── shared.ts              # Shared constants (IDFM ID prefixes)
 ├── scripts/
 │   ├── generate-all.ts        # Batch generation script
 │   └── generate-line-station-mapping.ts  # Build line↔station mapping

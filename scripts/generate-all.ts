@@ -6,9 +6,7 @@ import { CacheDB } from "../lib/client/cache.ts";
 import type * as Navitia from "../lib/client/navitia/index.ts";
 import { generateLineFeed, filterDisruptionsForLines } from "../lib/generators/line.ts";
 import { generateStationFeed, filterDisruptionsForStopArea } from "../lib/generators/station.ts";
-
-const LINE_PREFIX = "line:IDFM:";
-const STOP_AREA_PREFIX = "stop_area:IDFM:";
+import { stripLinePrefix, stripStopAreaPrefix } from "../lib/shared.ts";
 
 const TEXT_COLOR_MAP: Record<string, number> = { "000000": 0, "FFFFFF": 1 };
 
@@ -33,20 +31,6 @@ function extractCommune(name: string, label: string): string | undefined {
   }
   if (label !== name) return label;
   return undefined;
-}
-
-function stripLinePrefix(id: string): string {
-  if (!id.startsWith(LINE_PREFIX)) {
-    throw new Error(`Invalid line ID prefix, expected ${JSON.stringify(LINE_PREFIX)}, got ${JSON.stringify(id)}`);
-  }
-  return id.slice(LINE_PREFIX.length);
-}
-
-function stripStopAreaPrefix(id: string): string {
-  if (!id.startsWith(STOP_AREA_PREFIX)) {
-    throw new Error(`Invalid stop_area ID prefix, expected ${JSON.stringify(STOP_AREA_PREFIX)}, got ${JSON.stringify(id)}`);
-  }
-  return id.slice(STOP_AREA_PREFIX.length);
 }
 
 const OUTPUT_DIR = Util.pathInProjectRoot("dist/calendars");

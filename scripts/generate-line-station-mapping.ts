@@ -2,23 +2,7 @@ import SQLite from "sqlite3";
 import { Util, Client } from "../lib/index.ts";
 import { CacheDB } from "../lib/client/cache.ts";
 import type * as Navitia from "../lib/client/navitia/index.ts";
-
-const LINE_PREFIX = "line:IDFM:";
-const STOP_AREA_PREFIX = "stop_area:IDFM:";
-
-function stripLinePrefix(id: string): string {
-  if (!id.startsWith(LINE_PREFIX)) {
-    throw new Error(`Invalid line ID prefix, expected ${JSON.stringify(LINE_PREFIX)}, got ${JSON.stringify(id)}`);
-  }
-  return id.slice(LINE_PREFIX.length);
-}
-
-function stripStopAreaPrefix(id: string): string {
-  if (!id.startsWith(STOP_AREA_PREFIX)) {
-    throw new Error(`Invalid stop_area ID prefix, expected ${JSON.stringify(STOP_AREA_PREFIX)}, got ${JSON.stringify(id)}`);
-  }
-  return id.slice(STOP_AREA_PREFIX.length);
-}
+import { stripLinePrefix, stripStopAreaPrefix } from "../lib/shared.ts";
 
 const DB_PATH = Util.pathInProjectRoot("cache/line_station_mapping.db");
 

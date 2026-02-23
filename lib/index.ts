@@ -4,23 +4,12 @@ export { Utils as Util };
 import logger from "./logger.ts";
 import type { PagingParameters } from "./client/navitia/urls.ts";
 
-
 /*
   IDFM PRIM API (Navitia)
   Base URL: https://prim.iledefrance-mobilites.fr/marketplace/v2/navitia/
   Auth: APIKey header (get key at https://connect.iledefrance-mobilites.fr/)
 */
 const URL_ROOT = "https://prim.iledefrance-mobilites.fr/marketplace/v2/navitia/";
-
-/** Note parameters are given as singular, and expect the plural to be just an `s` appended.
- * Wont work with the PhysicalMode enum
- */
-export function makeNavitiaLineReportsURL(path: [string, string][]) {
-  const base = "https://prim.iledefrance-mobilites.fr/marketplace/v2/navitia/line_reports";
-  const parts = path.map(([ name, value ]) => `${name}s/${encodeURIComponent(`${name}:${value}`)}`);
-  return Utils.joinURLPath(base, ...parts, "line_reports")
-}
-
 
 export class Client {
   private readonly cache: Cache | undefined;

@@ -1,4 +1,4 @@
-.PHONY: generate clean run mapping
+.PHONY: generate clean mapping
 
 NODE_FLAGS = --no-warnings --experimental-transform-types
 
@@ -7,9 +7,6 @@ generate:
 
 mapping:
 	node $(NODE_FLAGS) scripts/generate-line-station-mapping.ts
-
-run:
-	node $(NODE_FLAGS) index.ts | pino-pretty
 
 clean:
 	rm -rf dist/calendars

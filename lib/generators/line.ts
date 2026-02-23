@@ -1,10 +1,6 @@
 import type { Disruption, PTLine } from "../client/navitia/types.ts";
 import { createCalendar, disruptionToVEvent, MODE_ICON, type VEvent, type EventContext } from "../ical.ts";
 
-export function filterDisruptionsForLine(disruptions: Disruption[], lineId: string): Disruption[] {
-  return filterDisruptionsForLines(disruptions, [lineId]);
-}
-
 export function filterDisruptionsForLines(disruptions: Disruption[], lineIds: string[]): Disruption[] {
   const idSet = new Set(lineIds);
   return disruptions.filter(d =>
