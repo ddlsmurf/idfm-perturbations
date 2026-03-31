@@ -4,4 +4,5 @@
   languages.javascript.enable = true;
   languages.javascript.npm.enable = true;
   languages.javascript.npm.install.enable = true;
+  dotenv.enable = true;
 }
