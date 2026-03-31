@@ -6,7 +6,7 @@ import { CacheDB } from "../lib/client/cache.ts";
 import type * as Navitia from "../lib/client/navitia/index.ts";
 import { generateLineFeed, filterDisruptionsForLines } from "../lib/generators/line.ts";
 import { generateStationFeed, filterDisruptionsForStopArea } from "../lib/generators/station.ts";
-import { stripLinePrefix, stripStopAreaPrefix } from "../lib/shared.ts";
+import { LINE_PREFIX, STOP_AREA_PREFIX, stripLinePrefix, stripStopAreaPrefix } from "../lib/shared.ts";
 
 const TEXT_COLOR_MAP: Record<string, number> = { "000000": 0, "FFFFFF": 1 };
 
