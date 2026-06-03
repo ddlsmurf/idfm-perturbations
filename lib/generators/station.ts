@@ -38,7 +38,7 @@ export function generateStationFeed(
 ): string {
   const stationDisruptions = filterDisruptionsForStopArea(disruptions, stopArea.id, stationLineIds);
   const events: VEvent[] = stationDisruptions
-    .map(d => {
+    .flatMap(d => {
       const line = getLineFromDisruption(d);
       const context: EventContext = {
         modeName: line?.commercial_mode?.name,
@@ -47,8 +47,7 @@ export function generateStationFeed(
         geo: stopArea.coord,
       };
       return disruptionToVEvent(d, context);
-    })
-    .filter((e): e is VEvent => e !== null);
+    });
 
   return createCalendar(events, {
     name: `${stopArea.name} - Perturbations IDFM`,

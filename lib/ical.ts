@@ -116,10 +116,9 @@ function getAffectedStations(disruption: Disruption): AffectedStations {
   return {};
 }
 
-export function disruptionToVEvent(disruption: Disruption, context?: EventContext): VEvent | null {
-  if (!disruption.application_periods?.length) return null;
+export function disruptionToVEvent(disruption: Disruption, context?: EventContext): VEvent[] {
+  if (!disruption.application_periods?.length) return [];
 
-  const period = disruption.application_periods[0];
   const message = disruption.messages?.find(m => m.text)?.text ?? "";
   const effectKey = disruption.severity?.effect ?? "UNKNOWN_EFFECT";
   let effectFr = EFFECT_FR[effectKey];
@@ -169,8 +168,12 @@ export function disruptionToVEvent(disruption: Disruption, context?: EventContex
     location = stationName;
   }
 
-  return {
-    uid: `${disruption.id}@idfm.ratp_to_ical`,
+  const periods = disruption.application_periods;
+  const multiPeriod = periods.length > 1;
+  return periods.map((period, index) => ({
+    uid: multiPeriod
+      ? `${disruption.id}-${index}@idfm.ratp_to_ical`
+      : `${disruption.id}@idfm.ratp_to_ical`,
     summary,
     dtstart: formatICalDateTime(period.begin),
     dtend: formatICalDateTime(period.end),
@@ -178,7 +181,7 @@ export function disruptionToVEvent(disruption: Disruption, context?: EventContex
     categories: [effectKey, cause].filter(Boolean),
     location,
     geo: context?.geo,
-  };
+  }));
 }
 
 function veventToIcal(event: VEvent, timezone: string): string {

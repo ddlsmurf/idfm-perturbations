@@ -23,8 +23,7 @@ export function generateLineFeed(
     lineCode: line.code,
   };
   const events: VEvent[] = lineDisruptions
-    .map(d => disruptionToVEvent(d, context))
-    .filter((e): e is VEvent => e !== null);
+    .flatMap(d => disruptionToVEvent(d, context));
 
   const modeName = line.commercial_mode?.name ?? line.physical_modes?.[0]?.name ?? "";
   const modeLabel = MODE_ICON[modeName] ?? modeName;
