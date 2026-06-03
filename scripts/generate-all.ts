@@ -197,6 +197,12 @@ async function main() {
   const lines = linesResponse.result;
   console.error(`  Found ${lines.length} lines`);
 
+  const lineToMode = new Map(lines.map(l => [l.id, l.commercial_mode?.name]));
+  // Rail = every mode except Bus; used for the "sans bus" per-station variant.
+  const RAIL_MODES = new Set(
+    [...lineToMode.values()].filter((m): m is string => !!m && m !== "Bus"),
+  );
+
   console.error("Fetching stop_areas...");
   const stopAreasResponse = await getAllPages<Navitia.StopArea>("stop_areas", "stop_areas");
   const stopAreas = stopAreasResponse.result;
@@ -242,18 +248,28 @@ async function main() {
   }
   console.error(`  Generated ${lineCount} line feeds`);
 
-  // Generate station feeds
+  // Generate station feeds. Stations served by both rail and bus lines also get
+  // a "_rail.ics" variant with the buses filtered out (see RAIL_MODES).
   console.error("Generating station feeds...");
   let stationCount = 0;
+  const railVariantStations = new Set<string>();
   for (const stopArea of stopAreas) {
     const strippedId = stripStopAreaPrefix(stopArea.id);
-    const filepath = Path.join(STATIONS_DIR, strippedId + ".ics");
-    const lineIds = new Set(stationLines?.get(stopArea.id) ?? []);
+    const stationLineIds = stationLines?.get(stopArea.id) ?? [];
+    const lineIds = new Set(stationLineIds);
     const ical = generateStationFeed(stopArea, allDisruptions, timezone, lineIds);
-    FS.writeFileSync(filepath, ical, "utf-8");
+    FS.writeFileSync(Path.join(STATIONS_DIR, strippedId + ".ics"), ical, "utf-8");
     stationCount++;
+
+    const hasBus = stationLineIds.some(id => lineToMode.get(id) === "Bus");
+    const hasRail = stationLineIds.some(id => RAIL_MODES.has(lineToMode.get(id) ?? ""));
+    if (hasBus && hasRail) {
+      const icalRail = generateStationFeed(stopArea, allDisruptions, timezone, lineIds, RAIL_MODES);
+      FS.writeFileSync(Path.join(STATIONS_DIR, strippedId + "_rail.ics"), icalRail, "utf-8");
+      railVariantStations.add(strippedId);
+    }
   }
-  console.error(`  Generated ${stationCount} station feeds`);
+  console.error(`  Generated ${stationCount} station feeds (${railVariantStations.size} with rail-only variant)`);
 
   // Compute disruption date range (ignore placeholder year 2099)
   const allPeriods = allDisruptions.flatMap(d => d.application_periods ?? []);
@@ -325,6 +341,7 @@ async function main() {
         la: s.coord ? parseFloat(s.coord.lat) : null,
         lo: s.coord ? parseFloat(s.coord.lon) : null,
         e: events > 0 ? events : null,
+        r: railVariantStations.has(stripStopAreaPrefix(s.id)) ? 1 : null,
         l: [...new Set(
           stationLines?.get(s.id)
             ?.map(lineId => lineIdToIndex.get(lineId))

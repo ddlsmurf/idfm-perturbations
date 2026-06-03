@@ -35,13 +35,18 @@ export function generateStationFeed(
   disruptions: Disruption[],
   timezone: string,
   stationLineIds?: Set<string>,
+  allowedModes?: Set<string>,
 ): string {
   const stationDisruptions = filterDisruptionsForStopArea(disruptions, stopArea.id, stationLineIds);
   const events: VEvent[] = stationDisruptions
     .flatMap(d => {
       const line = getLineFromDisruption(d);
+      // Mode-filtered variant (e.g. rail-only): drop line disruptions whose mode
+      // is excluded; line-less, station-level disruptions have no mode and stay.
+      const modeName = line?.commercial_mode?.name;
+      if (allowedModes && modeName && !allowedModes.has(modeName)) return [];
       const context: EventContext = {
-        modeName: line?.commercial_mode?.name,
+        modeName,
         lineCode: line?.code,
         stationName: stopArea.name,
         geo: stopArea.coord,
