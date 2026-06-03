@@ -110,17 +110,45 @@ function floorToDayMs(epochMs: number): number {
   return epochMs - (((epochMs % MS_PER_DAY) + MS_PER_DAY) % MS_PER_DAY);
 }
 
-// Splits one application period into calendar segments: timed events on partial
-// leading/trailing days and a single all-day event spanning the full interior
-// days. A span that crosses midnight but covers no full day stays one timed
-// event. Near-midnight bounds snap to midnight (see MIDNIGHT_SNAP_SECONDS).
-export function splitPeriodIntoSegments(begin: string, end: string): DateSegment[] {
+export interface Interval {
+  beginMs: number;
+  endMs: number;
+}
+
+// Parses a Navitia application period into an epoch interval, snapping bounds
+// within MIDNIGHT_SNAP_SECONDS of midnight to midnight.
+export function periodToInterval(begin: string, end: string): Interval {
   const beginMs = snapToMidnight(wallClockToEpochMs(begin));
   const endMs = snapToMidnight(wallClockToEpochMs(end));
   if (endMs <= beginMs) {
     throw new Error(`Period end not after start: ${JSON.stringify({ begin, end })}`);
   }
+  return { beginMs, endMs };
+}
 
+// Union of intervals: sorted by start, with overlapping or touching intervals
+// merged. A disruption's application_periods can overlap heavily (the API often
+// encodes one long span as many daily-start windows sharing a common end);
+// merging avoids emitting stacks of overlapping all-day blocks and duplicates.
+export function mergeIntervals(intervals: Interval[]): Interval[] {
+  const sorted = [...intervals].sort((a, b) => a.beginMs - b.beginMs);
+  const merged: Interval[] = [];
+  for (const interval of sorted) {
+    const last = merged[merged.length - 1];
+    if (last && interval.beginMs <= last.endMs) {
+      last.endMs = Math.max(last.endMs, interval.endMs);
+    } else {
+      merged.push({ ...interval });
+    }
+  }
+  return merged;
+}
+
+// Splits one interval into calendar segments: timed events on partial
+// leading/trailing days and a single all-day event spanning the full interior
+// days. A span that crosses midnight but covers no full day stays one timed
+// event.
+export function splitIntervalIntoSegments({ beginMs, endMs }: Interval): DateSegment[] {
   const beginDayMs = floorToDayMs(beginMs);
   const endDayMs = floorToDayMs(endMs);
   const beginAtMidnight = beginMs === beginDayMs;
@@ -143,6 +171,10 @@ export function splitPeriodIntoSegments(begin: string, end: string): DateSegment
     segments.push({ dtstart: epochMsToDateTime(endDayMs), dtend: epochMsToDateTime(endMs), allDay: false });
   }
   return segments;
+}
+
+export function splitPeriodIntoSegments(begin: string, end: string): DateSegment[] {
+  return splitIntervalIntoSegments(periodToInterval(begin, end));
 }
 
 function stripHtml(html: string): string {
@@ -243,15 +275,18 @@ export function disruptionToVEvent(disruption: Disruption, context?: EventContex
   }
 
   const categories = [effectKey, cause].filter(Boolean);
+  const intervals = mergeIntervals(
+    disruption.application_periods.map(period => periodToInterval(period.begin, period.end)),
+  );
   const placed: { segment: DateSegment; uidSuffix: string }[] = [];
-  disruption.application_periods.forEach((period, periodIndex) => {
-    splitPeriodIntoSegments(period.begin, period.end).forEach((segment, segmentIndex) => {
-      placed.push({ segment, uidSuffix: `-${periodIndex}-${segmentIndex}` });
+  intervals.forEach((interval, intervalIndex) => {
+    splitIntervalIntoSegments(interval).forEach((segment, segmentIndex) => {
+      placed.push({ segment, uidSuffix: `-${intervalIndex}-${segmentIndex}` });
     });
   });
 
   // Keep the bare disruption id as UID when it maps to a single event (no churn
-  // for the common case); otherwise suffix with period/segment indices to stay
+  // for the common case); otherwise suffix with interval/segment indices to stay
   // unique and stable across runs.
   const single = placed.length === 1;
   return placed.map(({ segment, uidSuffix }) => ({
@@ -353,8 +388,21 @@ export function createCalendar(events: VEvent[], metadata: CalendarMetadata): st
 
   const header = lines.map(foldLine).join(CRLF);
   const tz = timezoneComponent(metadata.timezone);
-  events.sort((a, b) => a.dtstart.localeCompare(b.dtstart));
-  const eventBlocks = events.map(e => veventToIcal(e, metadata.timezone)).join(CRLF);
+
+  // Drop events that render identically (same content, ignoring UID). Distinct
+  // disruption impact ids can describe the very same perturbation; without this
+  // they would appear as duplicate calendar entries.
+  const seen = new Set<string>();
+  const uniqueEvents = events.filter(event => {
+    const { uid, ...content } = event;
+    const key = JSON.stringify(content);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  uniqueEvents.sort((a, b) => a.dtstart.localeCompare(b.dtstart));
+  const eventBlocks = uniqueEvents.map(e => veventToIcal(e, metadata.timezone)).join(CRLF);
   const footer = "END:VCALENDAR";
 
   return [header, tz, eventBlocks, footer].filter(Boolean).join(CRLF) + CRLF;
