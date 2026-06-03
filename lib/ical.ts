@@ -38,7 +38,11 @@ export interface VEvent {
   dtstart: string;
   dtend: string;
   allDay?: boolean;
-  description?: string;
+  // Structured prefix (section / affected stops) and free-text message are kept
+  // apart: the prefix is part of an event's identity, the message is merged when
+  // otherwise-identical events are collapsed. Rendered as one DESCRIPTION.
+  descriptionHeader?: string;
+  descriptionBody?: string;
   categories?: string[];
   url?: string;
   location?: string;
@@ -255,7 +259,7 @@ export function disruptionToVEvent(disruption: Disruption, context?: EventContex
     summary += ` (${affected.section.from} → ${affected.section.to})`;
   }
 
-  let description = stripHtml(message);
+  const descriptionBody = stripHtml(message) || undefined;
   const descParts: string[] = [];
   if (affected.section) {
     descParts.push(`Section: ${affected.section.from} → ${affected.section.to}`);
@@ -263,9 +267,7 @@ export function disruptionToVEvent(disruption: Disruption, context?: EventContex
   if (affected.stops?.length) {
     descParts.push(`Arrêts concernés: ${affected.stops.join(", ")}`);
   }
-  if (descParts.length) {
-    description = description ? `${descParts.join("\n")}\n\n${description}` : descParts.join("\n");
-  }
+  const descriptionHeader = descParts.length ? descParts.join("\n") : undefined;
 
   let location: string | undefined;
   if (affected.section) {
@@ -295,7 +297,8 @@ export function disruptionToVEvent(disruption: Disruption, context?: EventContex
     dtstart: segment.dtstart,
     dtend: segment.dtend,
     allDay: segment.allDay,
-    description: description || undefined,
+    descriptionHeader,
+    descriptionBody,
     categories,
     location,
     geo: context?.geo,
@@ -315,8 +318,9 @@ function veventToIcal(event: VEvent, timezone: string): string {
     "TRANSP:TRANSPARENT",
     "X-APPLE-DEFAULT-ALARM:FALSE",
   ];
-  if (event.description) {
-    lines.push(`DESCRIPTION:${escapeICalText(event.description)}`);
+  const description = [event.descriptionHeader, event.descriptionBody].filter(Boolean).join("\n\n");
+  if (description) {
+    lines.push(`DESCRIPTION:${escapeICalText(description)}`);
   }
   if (event.location) {
     lines.push(`LOCATION:${escapeICalText(event.location)}`);
@@ -371,6 +375,22 @@ export interface CalendarMetadata {
   timezone: string;
 }
 
+// Combines the free-text messages of events that are otherwise identical: a
+// message fully contained in another is dropped (keeping the longer one); the
+// remaining distinct messages are concatenated.
+function mergeMessages(messages: (string | undefined)[]): string | undefined {
+  const kept: string[] = [];
+  for (const message of messages) {
+    if (!message) continue;
+    if (kept.some(k => k.includes(message))) continue;
+    for (let i = kept.length - 1; i >= 0; i--) {
+      if (message.includes(kept[i])) kept.splice(i, 1);
+    }
+    kept.push(message);
+  }
+  return kept.length ? kept.join("\n\n") : undefined;
+}
+
 export function createCalendar(events: VEvent[], metadata: CalendarMetadata): string {
   const lines: string[] = [
     "BEGIN:VCALENDAR",
@@ -389,16 +409,26 @@ export function createCalendar(events: VEvent[], metadata: CalendarMetadata): st
   const header = lines.map(foldLine).join(CRLF);
   const tz = timezoneComponent(metadata.timezone);
 
-  // Drop events that render identically (same content, ignoring UID). Distinct
-  // disruption impact ids can describe the very same perturbation; without this
-  // they would appear as duplicate calendar entries.
-  const seen = new Set<string>();
-  const uniqueEvents = events.filter(event => {
-    const { uid, ...content } = event;
-    const key = JSON.stringify(content);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
+  // Collapse events that are identical apart from their free-text message
+  // (distinct disruption impact ids often describe the same perturbation, sharing
+  // the same section header): group by everything but the message — including the
+  // descriptionHeader — then merge the messages into one event.
+  const groups = new Map<string, VEvent[]>();
+  const order: string[] = [];
+  for (const event of events) {
+    const { uid, descriptionBody, ...rest } = event;
+    const key = JSON.stringify(rest);
+    let group = groups.get(key);
+    if (!group) {
+      group = [];
+      groups.set(key, group);
+      order.push(key);
+    }
+    group.push(event);
+  }
+  const uniqueEvents = order.map(key => {
+    const group = groups.get(key)!;
+    return { ...group[0], descriptionBody: mergeMessages(group.map(e => e.descriptionBody)) };
   });
 
   uniqueEvents.sort((a, b) => a.dtstart.localeCompare(b.dtstart));
