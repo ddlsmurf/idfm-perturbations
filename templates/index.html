@@ -179,7 +179,7 @@
     }
     .btn:hover { border-color: var(--accent); color: var(--accent); }
     .btn.copied { border-color: #4ade80; color: #4ade80; }
-    .icon-btn { width: 30px; height: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-color: var(--accent); color: var(--accent); opacity: 0.6; }
+    .icon-btn { width: 30px; height: 30px; padding: 0; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border-color: var(--accent); color: var(--accent); opacity: 0.6; }
     .icon-btn:hover { background: var(--accent); color: var(--bg); opacity: 1; }
     .icon-btn.primary { opacity: 1; }
     .icon-btn svg { display: block; }
@@ -241,7 +241,7 @@
     }
     .station-table .mode-group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 0.1rem; margin-right: 0.5rem; }
     .station-table .mode-group > img { width: 14px; height: 14px; flex-shrink: 0; margin-right: 0.15rem; }
-    .station-table .actions { text-align: right; white-space: nowrap; display: flex; justify-content: flex-end; gap: 0.4rem; }
+    .station-table .actions { text-align: right; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.4rem; margin-left: auto; }
 
     /* Empty / message states */
     .empty, .message {
@@ -363,11 +363,22 @@
       .badge { min-width: 2rem; height: 2rem; font-size: 0.8rem; }
       .badge.metro { min-width: 2rem; width: 2rem; }
 
-      .station-table tr { display: flex; flex-wrap: wrap; padding: 0.5rem 0; }
-      .station-table td { display: block; padding: 0.25rem 0.5rem; border: none; }
-      .station-table td:first-child { flex: 1; min-width: 0; }
-      .station-table td.actions { flex-shrink: 0; }
-      .station-table td.lines { width: 100%; padding-left: 1rem; order: 3; }
+      /* Two-column grid: name (fills, can wrap) + actions (snug right), lines span below */
+      .station-table tr {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-areas:
+          "name actions"
+          "lines lines";
+        align-items: start;
+        gap: 0.3rem 0.5rem;
+        padding: 0.5rem;
+      }
+      .station-table td { display: block; padding: 0; border: none; }
+      .station-table td:first-child { grid-area: name; min-width: 0; }
+      .station-table td.lines { grid-area: lines; }
+      .station-table td.actions { grid-area: actions; }
+      .icon-btn { padding: 0; }
 
       .stats { gap: 0.5rem 1rem; font-size: 0.75rem; }
     }
