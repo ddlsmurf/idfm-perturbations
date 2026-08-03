@@ -468,6 +468,7 @@
     let currentTab = 'lines';
     let forceShowAll = false;
     let filterLineIdx = null;
+    let renderedStations = [];
     let lineSiblings = new Map();
     const BASE_URL = location.href.replace(/\/[^/]*$/, '/');
     const MAX_RESULTS = 500;
@@ -1108,8 +1109,8 @@
       document.getElementById('exclude-buses')?.addEventListener('change', (e) => {
         excludeBuses = e.target.checked;
         localStorage.setItem('excludeBuses', excludeBuses ? '1' : '0');
-        renderLegend();
-        render();
+        refreshStationActions();
+        syncUrlState();
       });
     }
 
@@ -1597,8 +1598,22 @@
           grid.parentNode.insertBefore(tableContainer, grid.nextSibling);
         }
         tableContainer.innerHTML = `<table class="station-table"><tbody>${items.map(renderStationRow).join('')}</tbody></table>`;
+        renderedStations = items;
       }
       syncUrlState();
+    }
+
+    /**
+     * Toggling "exclude buses" changes neither the result set nor its order, only which feed
+     * each row points at — so patch the action cells instead of re-filtering 15k stations.
+     */
+    function refreshStationActions() {
+      const cells = document.querySelectorAll('#station-table-container td.actions');
+      if (!cells.length) return;
+      if (cells.length !== renderedStations.length) {
+        throw new Error(`Station table out of sync: ${cells.length} rendered rows for ${renderedStations.length} stations`);
+      }
+      cells.forEach((cell, i) => { cell.innerHTML = renderStationActions(renderedStations[i]); });
     }
 
     function syncUrlState() {
@@ -1803,10 +1818,24 @@
       return { url: base + '.ics', busFree: false, unavailable: stationIsBusOnly(station) };
     }
 
-    function renderStationRow(station) {
+    /** The only part of a station row that depends on the "exclude buses" toggle. */
+    function renderStationActions(station) {
       const feed = stationFeed(station);
       const subscribeUrl = getSubscribeUrl(feed.url);
       const hasEvents = !feed.unavailable && (feed.busFree ? station.railEvents > 0 : station.events > 0);
+
+      return `
+        ${feed.unavailable
+          ? `<span class="btn icon-btn disabled" title="${t('noBusFreeFeed')}">${ICONS.preview}</span>`
+          : `<button class="btn icon-btn preview-btn${hasEvents ? '' : ' invisible'}" data-url="${escAttr(feed.url)}" title="${t('preview')}"${hasEvents ? '' : ' disabled'}>${ICONS.preview}</button>`}
+        ${station.lat != null ? `<a class="btn icon-btn" href="https://www.openstreetmap.org/?mlat=${station.lat}&mlon=${station.lon}#map=16/${station.lat}/${station.lon}" target="_blank" rel="noopener" title="${t('showMap')}">${ICONS.location}</a>` : ''}
+        ${feed.unavailable
+          ? `<span class="btn icon-btn disabled" title="${t('noBusFreeFeed')}">${ICONS.subscribeRail}</span>`
+          : `<a class="btn icon-btn primary subscribe-btn" href="${escAttr(subscribeUrl)}" data-url="${escAttr(feed.url)}" target="_blank" rel="noopener" title="${t(feed.busFree ? 'addCalRail' : 'addCal')}">${feed.busFree ? ICONS.subscribeRail : ICONS.subscribe}</a>`}
+      `;
+    }
+
+    function renderStationRow(station) {
 
       const linesByMode = new Map();
       for (const idx of (station.lines || [])) {
@@ -1863,15 +1892,7 @@
         <tr>
           <td><span class="name">${escHtml(station.name)}</span>${station.commune || station._dist != null ? `<br><span class="label">${[station.commune, station._dist != null ? formatDistance(station._dist) : null].filter(Boolean).join(' · ')}</span>` : ''}</td>
           <td class="lines">${linesBadges}</td>
-          <td class="actions">
-            ${feed.unavailable
-              ? `<span class="btn icon-btn disabled" title="${t('noBusFreeFeed')}">${ICONS.preview}</span>`
-              : `<button class="btn icon-btn preview-btn${hasEvents ? '' : ' invisible'}" data-url="${escAttr(feed.url)}" title="${t('preview')}"${hasEvents ? '' : ' disabled'}>${ICONS.preview}</button>`}
-            ${station.lat != null ? `<a class="btn icon-btn" href="https://www.openstreetmap.org/?mlat=${station.lat}&mlon=${station.lon}#map=16/${station.lat}/${station.lon}" target="_blank" rel="noopener" title="${t('showMap')}">${ICONS.location}</a>` : ''}
-            ${feed.unavailable
-              ? `<span class="btn icon-btn disabled" title="${t('noBusFreeFeed')}">${ICONS.subscribeRail}</span>`
-              : `<a class="btn icon-btn primary subscribe-btn" href="${escAttr(subscribeUrl)}" data-url="${escAttr(feed.url)}" target="_blank" rel="noopener" title="${t(feed.busFree ? 'addCalRail' : 'addCal')}">${feed.busFree ? ICONS.subscribeRail : ICONS.subscribe}</a>`}
-          </td>
+          <td class="actions">${renderStationActions(station)}</td>
         </tr>
       `;
     }
