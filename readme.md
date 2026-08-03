@@ -35,6 +35,7 @@ Generate all calendar feeds:
 ```bash
 make mapping # Updates a local cache with stations-line mappings. Needs a lot of API calls
 make generate # Requires the local cache. Updates disturbances.
+make serve   # Serves dist/calendars on http://localhost:8000 to try the web interface
 ```
 
 See [Actions](https://github.com/ddlsmurf/idfm-perturbations/actions) for example runs.
@@ -64,12 +65,16 @@ bus-only stations.
 
 Known limit: a station absent from `cache/line_station_mapping.db` has no known line, so no
 variant is written for it, yet its feed can still pick up bus disruptions matched by stop
-point instead of by line — the checkbox has no effect there. This affects 4 of the 15372
-stations as of August 2026.
+point instead of by line — the checkbox has no effect on those few stations.
 
 ## Deployment
 
 The `dist/calendars/` folder can be deployed to any static hosting.
+
+Deploying replaces the whole site, so generation refuses to leave a partial `dist/calendars`
+behind: it prunes feeds earlier runs produced, then fails unless what is on disk is exactly
+what it just wrote. Host-side limits, such as the number of files Cloudflare Pages accepts per
+deployment, are left to the deploy step, which fails without publishing.
 
 ## Project Structure
 

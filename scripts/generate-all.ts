@@ -169,6 +169,44 @@ function loadMappingData(dbPath: string): Promise<MappingData> {
   });
 }
 
+const ROOT_FILES = ["index.html", "index.json", "version.json"];
+
+/** Feeds a previous run produced and this one did not would otherwise be deployed forever. */
+function removeStaleFeeds(dir: string, written: Set<string>): number {
+  const stale = FS.readdirSync(dir).filter(name => !written.has(name));
+  for (const name of stale) FS.unlinkSync(Path.join(dir, name));
+  return stale.length;
+}
+
+/**
+ * Deploying replaces the whole site, so refuse to finish on output a deploy would publish
+ * as a broken production: what is on disk must be exactly what this run wrote.
+ */
+function assertOutputComplete(lineFiles: Set<string>, stationFiles: Set<string>) {
+  const staleCount = removeStaleFeeds(LINES_DIR, lineFiles) + removeStaleFeeds(STATIONS_DIR, stationFiles);
+  if (staleCount > 0) console.error(`Removed ${staleCount} stale feeds`);
+
+  for (const [dir, written] of [[LINES_DIR, lineFiles], [STATIONS_DIR, stationFiles]] as const) {
+    const onDisk = FS.readdirSync(dir);
+    if (onDisk.length !== written.size) {
+      throw new Error(`Incomplete output: wrote ${written.size} feeds to ${JSON.stringify(dir)} but ${onDisk.length} are on disk`);
+    }
+    const missing = [...written].filter(name => !FS.statSync(Path.join(dir, name)).size);
+    if (missing.length) {
+      throw new Error(`Incomplete output: ${missing.length} empty feeds in ${JSON.stringify(dir)}, e.g. ${JSON.stringify(missing.slice(0, 5))}`);
+    }
+  }
+
+  for (const name of ROOT_FILES) {
+    const filepath = Path.join(OUTPUT_DIR, name);
+    if (!FS.existsSync(filepath) || FS.statSync(filepath).size === 0) {
+      throw new Error(`Incomplete output: ${JSON.stringify(filepath)} is missing or empty`);
+    }
+  }
+
+  console.error(`Output complete: ${lineFiles.size + stationFiles.size + ROOT_FILES.length} files`);
+}
+
 async function main() {
   console.error("=== IDFM Calendar Generator ===\n");
 
@@ -238,20 +276,19 @@ async function main() {
 
   // Generate line feeds (all lines, including merged bus variants)
   console.error("Generating line feeds...");
-  let lineCount = 0;
+  const lineFiles = new Set<string>();
   for (const line of lines) {
-    const strippedId = stripLinePrefix(line.id);
-    const filepath = Path.join(LINES_DIR, strippedId + ".ics");
+    const filename = stripLinePrefix(line.id) + ".ics";
     const ical = generateLineFeed(line, allDisruptions, timezone, rerMergeIds.get(line.id));
-    FS.writeFileSync(filepath, ical, "utf-8");
-    lineCount++;
+    FS.writeFileSync(Path.join(LINES_DIR, filename), ical, "utf-8");
+    lineFiles.add(filename);
   }
-  console.error(`  Generated ${lineCount} line feeds`);
+  console.error(`  Generated ${lineFiles.size} line feeds`);
 
   // Generate station feeds. Stations served by both rail and bus lines also get
   // a "_rail.ics" variant with the buses filtered out (see RAIL_MODES).
   console.error("Generating station feeds...");
-  let stationCount = 0;
+  const stationFiles = new Set<string>();
   const railVariantStations = new Set<string>();
   for (const stopArea of stopAreas) {
     const strippedId = stripStopAreaPrefix(stopArea.id);
@@ -259,16 +296,18 @@ async function main() {
     const lineIds = new Set(stationLineIds);
     const ical = generateStationFeed(stopArea, allDisruptions, timezone, lineIds);
     FS.writeFileSync(Path.join(STATIONS_DIR, strippedId + ".ics"), ical, "utf-8");
-    stationCount++;
+    stationFiles.add(strippedId + ".ics");
 
     const hasBus = stationLineIds.some(id => lineToMode.get(id) === "Bus");
     const hasRail = stationLineIds.some(id => RAIL_MODES.has(lineToMode.get(id) ?? ""));
     if (hasBus && hasRail) {
       const icalRail = generateStationFeed(stopArea, allDisruptions, timezone, lineIds, RAIL_MODES);
       FS.writeFileSync(Path.join(STATIONS_DIR, strippedId + "_rail.ics"), icalRail, "utf-8");
+      stationFiles.add(strippedId + "_rail.ics");
       railVariantStations.add(strippedId);
     }
   }
+  const stationCount = stationFiles.size - railVariantStations.size;
   console.error(`  Generated ${stationCount} station feeds (${railVariantStations.size} with rail-only variant)`);
 
   // Compute disruption date range (ignore placeholder year 2099)
@@ -374,6 +413,8 @@ async function main() {
   const htmlOutputPath = Path.join(OUTPUT_DIR, "index.html");
   FS.copyFileSync(templatePath, htmlOutputPath);
   console.error(`Copied index.html`);
+
+  assertOutputComplete(lineFiles, stationFiles);
 
   console.error("\n=== Done ===");
   console.error(`API calls: ${client.callCount}`);
