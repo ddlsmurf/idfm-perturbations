@@ -12,9 +12,15 @@ export function filterDisruptionsForStopArea(
   disruptions: Disruption[],
   stopAreaId: string,
   stationLineIds?: Set<string>,
+  allowedModes?: Set<string>,
 ): Disruption[] {
-  return disruptions.filter(d =>
-    d.impacted_objects?.some(io => {
+  return disruptions.filter(d => {
+    // Mode-filtered variant (e.g. rail-only): drop line disruptions whose mode
+    // is excluded; line-less, station-level disruptions have no mode and stay.
+    const modeName = getLineFromDisruption(d)?.commercial_mode?.name;
+    if (allowedModes && modeName && !allowedModes.has(modeName)) return false;
+
+    return d.impacted_objects?.some(io => {
       const pt = io.pt_object;
       if (!pt) return false;
       if (pt.embedded_type === "stop_area" && pt.stop_area?.id === stopAreaId) return true;
@@ -26,8 +32,8 @@ export function filterDisruptionsForStopArea(
       if (io.impacted_stops?.some(is => is.stop_point?.stop_area?.id === stopAreaId)) return true;
       if (stationLineIds?.size && pt.embedded_type === "line" && stationLineIds.has(pt.line?.id ?? "")) return true;
       return false;
-    })
-  );
+    });
+  });
 }
 
 export function generateStationFeed(
@@ -37,16 +43,12 @@ export function generateStationFeed(
   stationLineIds?: Set<string>,
   allowedModes?: Set<string>,
 ): string {
-  const stationDisruptions = filterDisruptionsForStopArea(disruptions, stopArea.id, stationLineIds);
+  const stationDisruptions = filterDisruptionsForStopArea(disruptions, stopArea.id, stationLineIds, allowedModes);
   const events: VEvent[] = stationDisruptions
     .flatMap(d => {
       const line = getLineFromDisruption(d);
-      // Mode-filtered variant (e.g. rail-only): drop line disruptions whose mode
-      // is excluded; line-less, station-level disruptions have no mode and stay.
-      const modeName = line?.commercial_mode?.name;
-      if (allowedModes && modeName && !allowedModes.has(modeName)) return [];
       const context: EventContext = {
-        modeName,
+        modeName: line?.commercial_mode?.name,
         lineCode: line?.code,
         stationName: stopArea.name,
         geo: stopArea.coord,

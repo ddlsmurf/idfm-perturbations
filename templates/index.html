@@ -182,14 +182,18 @@
     .icon-btn { width: 30px; height: 30px; padding: 0; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; border-color: var(--accent); color: var(--accent); opacity: 0.6; }
     .icon-btn:hover { background: var(--accent); color: var(--bg); opacity: 1; }
     .icon-btn.primary { opacity: 1; }
+    .icon-btn.disabled { border-color: var(--border); color: var(--text-muted); opacity: 0.4; cursor: default; pointer-events: none; }
     .icon-btn svg { display: block; }
 
     /* Legend */
     .legend { display: flex; gap: 1rem 1.5rem; margin-bottom: 1rem; font-size: 0.8rem; color: var(--text-muted); flex-wrap: wrap; justify-content: center; align-items: center; border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem 1rem; }
     .legend-title { width: 100%; text-align: center; font-size: 0.75rem; opacity: 0.7; }
-    .legend span { display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap; }
+    .legend span, .legend label { display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap; }
     .legend svg { width: 13.5px; height: 13.5px; min-width: 13.5px; border: 1px solid var(--accent); border-radius: 3px; padding: 0.26rem; box-sizing: content-box; color: var(--accent); opacity: 0.35; flex-shrink: 0; }
     .legend select { font-size: 0.8rem; padding: 0.15rem 0.3rem; margin-left: 0.2rem; }
+    .legend label { cursor: pointer; }
+    .legend label:hover { color: var(--text); }
+    .legend input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; margin: 0; }
     .alarm-tip { width: 100%; text-align: center; font-size: 0.75rem; opacity: 0.7; white-space: normal !important; }
 
     /* Station table */
@@ -487,6 +491,7 @@
     }
 
     let currentPlatform = localStorage.getItem('calendarPlatform') || detectDefaultPlatform();
+    let excludeBuses = localStorage.getItem('excludeBuses') === '1';
 
     function getSubscribeUrl(httpsUrl) {
       switch (currentPlatform) {
@@ -615,7 +620,8 @@
         preview: "Aperçu",
         copied: "Copié!",
         addCal: "+ 📆",
-        addCalRail: "S'abonner sans les bus de la station",
+        addCalRail: "S'abonner, sans les bus de la station",
+        noBusFreeFeed: "Cette station n'est desservie que par des bus",
         showStations: "Stations de cette ligne",
         showMap: "Voir sur la carte",
         reload: "Recharger",
@@ -677,7 +683,8 @@
         preview: "Preview",
         copied: "Copied!",
         addCal: "+ 📆",
-        addCalRail: "Subscribe without the station's buses",
+        addCalRail: "Subscribe, without the station's buses",
+        noBusFreeFeed: "This station is served by buses only",
         showStations: "Stations on this line",
         showMap: "Show on map",
         reload: "Reload",
@@ -810,7 +817,7 @@
         data.stations = fromColumnar(data.stations).map(s => ({
           id: s.i, name: s.n, commune: s.cm,
           lat: s.la, lon: s.lo,
-          events: s.e, lines: s.l, rail: s.r,
+          events: s.e, lines: s.l, rail: s.r, railEvents: s.er,
         }));
 
         loadingText.textContent = t('loadingDisplay');
@@ -825,7 +832,7 @@
         if (savedSort && savedSort !== 'distance') document.getElementById('sort').value = savedSort;
 
         restoreUrlState();
-        renderLegend(); // tab may have changed via the URL hash
+        renderLegend(); // tab and bus exclusion may have changed via the URL hash
 
         document.getElementById('loading').classList.add('hidden');
         document.getElementById('app').classList.remove('hidden');
@@ -1084,7 +1091,7 @@
         <span>${ICONS.subscribe} ${t('legendSubscribe')}
           <select id="platform-select">${platformOptions}</select>
         </span>
-        ${currentTab === 'stations' ? `<span>${ICONS.subscribeRail} ${t('legendRailSubscribe')}</span>` : ''}
+        ${currentTab === 'stations' ? `<label><input type="checkbox" id="exclude-buses"${excludeBuses ? ' checked' : ''}>${ICONS.subscribeRail} ${t('legendRailSubscribe')}</label>` : ''}
         <span>${ICONS.preview} ${t('legendPreview')}</span>
         ${currentTab === 'lines' ? `<span>${ICONS.stations} ${t('legendStations')}</span>` : ''}
         ${currentTab === 'stations' ? `<span>${ICONS.location} ${t('legendMap')}</span>` : ''}
@@ -1094,6 +1101,14 @@
       document.getElementById('platform-select').addEventListener('change', (e) => {
         currentPlatform = e.target.value;
         localStorage.setItem('calendarPlatform', currentPlatform);
+        render();
+      });
+
+      // Only rendered on the stations tab: the _rail.ics variants only exist for stations.
+      document.getElementById('exclude-buses')?.addEventListener('change', (e) => {
+        excludeBuses = e.target.checked;
+        localStorage.setItem('excludeBuses', excludeBuses ? '1' : '0');
+        renderLegend();
         render();
       });
     }
@@ -1596,6 +1611,7 @@
       const net = document.getElementById('network-filter').value;
       if (net) params.set('net', net);
       if (filterLineIdx != null) params.set('line', filterLineIdx);
+      if (excludeBuses) params.set('nobus', '1');
       const sort = document.getElementById('sort').value;
       if (sort && sort !== 'code') params.set('sort', sort);
       const radiusSel = document.getElementById('radius-select');
@@ -1625,6 +1641,7 @@
         const idx = parseInt(line, 10);
         if (idx >= 0 && idx < data.lines.length) filterLineIdx = idx;
       }
+      if (params.has('nobus')) excludeBuses = params.get('nobus') === '1';
       const sort = params.get('sort');
       const needsGeo = sort === 'distance';
       if (sort && !needsGeo) document.getElementById('sort').value = sort;
@@ -1770,12 +1787,26 @@
       return meters < 1000 ? `${Math.round(meters)} m` : `${(meters / 1000).toFixed(1)} km`;
     }
 
+    /** A station with no known line has station-level disruptions only, so it is not bus-only. */
+    function stationIsBusOnly(station) {
+      const lines = station.lines || [];
+      return lines.length > 0 && lines.every(idx => data.lines[idx]?.mode === 'Bus');
+    }
+
+    /** Which .ics a station row points at, given the "exclude buses" toggle. */
+    function stationFeed(station) {
+      const base = BASE_URL + 'stations/' + station.id;
+      if (!excludeBuses) return { url: base + '.ics', busFree: false, unavailable: false };
+      // Only mixed bus+rail stations get a _rail.ics variant; rail-only stations
+      // are already bus-free, bus-only ones have nothing left to offer.
+      if (station.rail) return { url: base + '_rail.ics', busFree: true, unavailable: false };
+      return { url: base + '.ics', busFree: false, unavailable: stationIsBusOnly(station) };
+    }
+
     function renderStationRow(station) {
-      const url = BASE_URL + 'stations/' + station.id + '.ics';
-      const subscribeUrl = getSubscribeUrl(url);
-      const railUrl = BASE_URL + 'stations/' + station.id + '_rail.ics';
-      const railSubscribeUrl = getSubscribeUrl(railUrl);
-      const hasEvents = station.events > 0;
+      const feed = stationFeed(station);
+      const subscribeUrl = getSubscribeUrl(feed.url);
+      const hasEvents = !feed.unavailable && (feed.busFree ? station.railEvents > 0 : station.events > 0);
 
       const linesByMode = new Map();
       for (const idx of (station.lines || [])) {
@@ -1833,10 +1864,13 @@
           <td><span class="name">${escHtml(station.name)}</span>${station.commune || station._dist != null ? `<br><span class="label">${[station.commune, station._dist != null ? formatDistance(station._dist) : null].filter(Boolean).join(' · ')}</span>` : ''}</td>
           <td class="lines">${linesBadges}</td>
           <td class="actions">
-            <button class="btn icon-btn preview-btn${hasEvents ? '' : ' invisible'}" data-url="${escAttr(url)}" title="${t('preview')}"${hasEvents ? '' : ' disabled'}>${ICONS.preview}</button>
+            ${feed.unavailable
+              ? `<span class="btn icon-btn disabled" title="${t('noBusFreeFeed')}">${ICONS.preview}</span>`
+              : `<button class="btn icon-btn preview-btn${hasEvents ? '' : ' invisible'}" data-url="${escAttr(feed.url)}" title="${t('preview')}"${hasEvents ? '' : ' disabled'}>${ICONS.preview}</button>`}
             ${station.lat != null ? `<a class="btn icon-btn" href="https://www.openstreetmap.org/?mlat=${station.lat}&mlon=${station.lon}#map=16/${station.lat}/${station.lon}" target="_blank" rel="noopener" title="${t('showMap')}">${ICONS.location}</a>` : ''}
-            ${station.rail ? `<a class="btn icon-btn primary subscribe-btn" href="${escAttr(railSubscribeUrl)}" data-url="${escAttr(railUrl)}" target="_blank" rel="noopener" title="${t('addCalRail')}">${ICONS.subscribeRail}</a>` : ''}
-            <a class="btn icon-btn primary subscribe-btn" href="${escAttr(subscribeUrl)}" data-url="${escAttr(url)}" target="_blank" rel="noopener" title="${t('addCal')}">${ICONS.subscribe}</a>
+            ${feed.unavailable
+              ? `<span class="btn icon-btn disabled" title="${t('noBusFreeFeed')}">${ICONS.subscribeRail}</span>`
+              : `<a class="btn icon-btn primary subscribe-btn" href="${escAttr(subscribeUrl)}" data-url="${escAttr(feed.url)}" target="_blank" rel="noopener" title="${t(feed.busFree ? 'addCalRail' : 'addCal')}">${feed.busFree ? ICONS.subscribeRail : ICONS.subscribe}</a>`}
           </td>
         </tr>
       `;

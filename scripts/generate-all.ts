@@ -332,16 +332,22 @@ async function main() {
       };
     })),
     stations: toColumnar(stopAreas.map(s => {
+      const strippedId = stripStopAreaPrefix(s.id);
       const lineIds = new Set(stationLines?.get(s.id) ?? []);
       const events = filterDisruptionsForStopArea(allDisruptions, s.id, lineIds).length;
+      const hasRailVariant = railVariantStations.has(strippedId);
+      const railEvents = hasRailVariant
+        ? filterDisruptionsForStopArea(allDisruptions, s.id, lineIds, RAIL_MODES).length
+        : 0;
       return {
-        i: stripStopAreaPrefix(s.id),
+        i: strippedId,
         n: s.name,
         cm: extractCommune(s.name, s.label) ?? null,
         la: s.coord ? parseFloat(s.coord.lat) : null,
         lo: s.coord ? parseFloat(s.coord.lon) : null,
         e: events > 0 ? events : null,
-        r: railVariantStations.has(stripStopAreaPrefix(s.id)) ? 1 : null,
+        r: hasRailVariant ? 1 : null,
+        er: railEvents > 0 ? railEvents : null,
         l: [...new Set(
           stationLines?.get(s.id)
             ?.map(lineId => lineIdToIndex.get(lineId))

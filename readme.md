@@ -44,13 +44,28 @@ Output structure:
 dist/calendars/
 ├── index.html          # Web interface
 ├── index.json          # Manifest with all lines/stations
-├── lines/              # One .ics per line (2000+ files)
-│   ├── line_IDFM_C01374.ics
+├── lines/              # One .ics per line (2000+ files), id without the "line:IDFM:" prefix
+│   ├── C01374.ics
 │   └── ...
-└── stations/           # One .ics per station (15000+ files)
-    ├── stop_area_IDFM_71043.ics
+└── stations/           # One .ics per station (15000+ files), id without the "stop_area:IDFM:" prefix
+    ├── 71043.ics
+    ├── 71043_rail.ics  # Same, minus the disruptions of the station's bus lines
     └── ...
 ```
+
+`_rail` means "every commercial mode except `Bus`" — there is no rail check, so tramway,
+funicular and Orlyval/CDG VAL are all included. The variant is only written where it would
+differ from the main feed, i.e. for stations served by buses *and* another mode: a station
+with no bus line already has a bus-free `.ics`, and one served only by buses has nothing
+left to offer. The web interface hides this behind the "exclude buses" checkbox in the legend
+of the stations tab, which switches the subscription and preview links of every station row — falling
+back to the plain `.ics` where it is already bus-free, and disabling both buttons for
+bus-only stations.
+
+Known limit: a station absent from `cache/line_station_mapping.db` has no known line, so no
+variant is written for it, yet its feed can still pick up bus disruptions matched by stop
+point instead of by line — the checkbox has no effect there. This affects 4 of the 15372
+stations as of August 2026.
 
 ## Deployment
 
