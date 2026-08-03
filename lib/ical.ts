@@ -119,6 +119,11 @@ export interface Interval {
   endMs: number;
 }
 
+// True when a period covers no time at all once its bounds are snapped.
+export function isEmptyPeriod(begin: string, end: string): boolean {
+  return snapToMidnight(wallClockToEpochMs(end)) === snapToMidnight(wallClockToEpochMs(begin));
+}
+
 // Parses a Navitia application period into an epoch interval, snapping bounds
 // within MIDNIGHT_SNAP_SECONDS of midnight to midnight.
 export function periodToInterval(begin: string, end: string): Interval {
@@ -277,8 +282,18 @@ export function disruptionToVEvent(disruption: Disruption, context?: EventContex
   }
 
   const categories = [effectKey, cause].filter(Boolean);
+  // The API does publish empty periods (begin === end); they describe nothing, so
+  // skip them rather than fail the whole run on one bad datum.
+  const periods = disruption.application_periods.filter(period => {
+    if (!isEmptyPeriod(period.begin, period.end)) return true;
+    if (process.env.GITHUB_ACTIONS) {
+      console.log(`::warning::Empty application period ${JSON.stringify(period)} (disruption ${disruption.id})`);
+    }
+    return false;
+  });
+  if (!periods.length) return [];
   const intervals = mergeIntervals(
-    disruption.application_periods.map(period => periodToInterval(period.begin, period.end)),
+    periods.map(period => periodToInterval(period.begin, period.end)),
   );
   const placed: { segment: DateSegment; uidSuffix: string }[] = [];
   intervals.forEach((interval, intervalIndex) => {

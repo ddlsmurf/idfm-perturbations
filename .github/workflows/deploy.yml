@@ -40,6 +40,9 @@ jobs:
       - name: Generate calendars
         id: generate
         run: |
+          # Without pipefail the exit code is tee's, so a crashed generator would
+          # deploy a partial dist/ over a working one.
+          set -o pipefail
           npm run generate 2>&1 | tee /tmp/generate.log
           API_CALLS=$(grep "API calls:" /tmp/generate.log | sed 's/.*API calls: //')
           echo "api_calls=${API_CALLS}" >> "$GITHUB_OUTPUT"
